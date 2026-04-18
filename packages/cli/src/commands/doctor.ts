@@ -2,13 +2,16 @@ import { defineCommand } from "citty";
 import type { Example } from "./_examples.js";
 import { execSync } from "node:child_process";
 
-export const examples: Example[] = [["Check system dependencies", "hyperframes doctor"]];
+export const examples: Example[] = [
+  ["Check system dependencies", "hyperframes doctor"],
+  ["Output as JSON for CI / agents", "hyperframes doctor --json"],
+];
 import { freemem, platform } from "node:os";
 import { c } from "../ui/colors.js";
 import { findBrowser } from "../browser/manager.js";
 import { findFFmpeg } from "../browser/ffmpeg.js";
 import { VERSION } from "../version.js";
-import { getUpdateMeta } from "../utils/updateCheck.js";
+import { getUpdateMeta, withMeta } from "../utils/updateCheck.js";
 import { getSystemMeta, getShmSizeMb, getFreeDiskMb, bytesToMb } from "../telemetry/system.js";
 
 interface Check {
@@ -178,14 +181,19 @@ function checkEnvironment(): CheckResult {
   return { ok: true, detail: parts.join(" \u00B7 ") };
 }
 
+interface CheckOutcome {
+  name: string;
+  ok: boolean;
+  detail: string;
+  hint?: string;
+}
+
 export default defineCommand({
   meta: { name: "doctor", description: "Check system dependencies and environment" },
-  args: {},
-  async run() {
-    console.log();
-    console.log(c.bold("hyperframes doctor"));
-    console.log();
-
+  args: {
+    json: { type: "boolean", description: "Output as JSON", default: false },
+  },
+  async run({ args }) {
     const checks: Check[] = [
       { name: "Version", run: checkVersion },
       { name: "Node.js", run: checkNode },
@@ -208,19 +216,49 @@ export default defineCommand({
       { name: "Docker running", run: checkDockerRunning },
     );
 
-    let allOk = true;
-
+    const outcomes: CheckOutcome[] = [];
     for (const check of checks) {
       const result = await check.run();
-      const icon = result.ok ? c.success("\u2713") : c.error("\u2717");
-      const name = check.name.padEnd(16);
+      outcomes.push({
+        name: check.name,
+        ok: result.ok,
+        detail: result.detail,
+        ...(result.hint ? { hint: result.hint } : {}),
+      });
+    }
+    const allOk = outcomes.every((o) => o.ok);
+
+    if (args.json) {
       console.log(
-        `  ${icon} ${c.bold(name)} ${result.ok ? c.dim(result.detail) : c.error(result.detail)}`,
+        JSON.stringify(
+          withMeta({
+            ok: allOk,
+            platform: process.platform,
+            arch: process.arch,
+            checks: outcomes,
+          }),
+          null,
+          2,
+        ),
       );
-      if (!result.ok && result.hint) {
-        console.log(`  ${" ".repeat(19)}${c.accent(result.hint)}`);
+      // Non-zero exit so `hyperframes doctor --json` is usable as a CI gate.
+      if (!allOk) process.exitCode = 1;
+      return;
+    }
+
+    console.log();
+    console.log(c.bold("hyperframes doctor"));
+    console.log();
+
+    for (const outcome of outcomes) {
+      const icon = outcome.ok ? c.success("\u2713") : c.error("\u2717");
+      const name = outcome.name.padEnd(16);
+      console.log(
+        `  ${icon} ${c.bold(name)} ${outcome.ok ? c.dim(outcome.detail) : c.error(outcome.detail)}`,
+      );
+      if (!outcome.ok && outcome.hint) {
+        console.log(`  ${" ".repeat(19)}${c.accent(outcome.hint)}`);
       }
-      if (!result.ok) allOk = false;
     }
 
     console.log();
