@@ -1,18 +1,18 @@
 import { defineCommand } from "citty";
-import type { Example } from "./_examples.js";
 import { execSync } from "node:child_process";
-
-export const examples: Example[] = [
-  ["Check system dependencies", "hyperframes doctor"],
-  ["Output as JSON for CI / agents", "hyperframes doctor --json"],
-];
 import { freemem, platform } from "node:os";
+import type { Example } from "./_examples.js";
 import { c } from "../ui/colors.js";
 import { findBrowser } from "../browser/manager.js";
 import { findFFmpeg } from "../browser/ffmpeg.js";
 import { VERSION } from "../version.js";
 import { getUpdateMeta, withMeta } from "../utils/updateCheck.js";
 import { getSystemMeta, getShmSizeMb, getFreeDiskMb, bytesToMb } from "../telemetry/system.js";
+
+export const examples: Example[] = [
+  ["Check system dependencies", "hyperframes doctor"],
+  ["Output as JSON for CI / agents", "hyperframes doctor --json"],
+];
 
 interface Check {
   name: string;
@@ -181,11 +181,51 @@ function checkEnvironment(): CheckResult {
   return { ok: true, detail: parts.join(" \u00B7 ") };
 }
 
-interface CheckOutcome {
+export interface CheckOutcome {
   name: string;
   ok: boolean;
   detail: string;
   hint?: string;
+}
+
+/**
+ * Replace the user's home directory path with the literal string `$HOME` so
+ * JSON output pasted into bug reports or agent contexts doesn't leak usernames.
+ * Safe no-op when HOME/USERPROFILE is unset.
+ */
+export function redactHome(s: string): string {
+  const home = process.env["HOME"] || process.env["USERPROFILE"];
+  if (!home) return s;
+  return s.split(home).join("$HOME");
+}
+
+function redactOutcome(o: CheckOutcome): CheckOutcome {
+  return {
+    name: o.name,
+    ok: o.ok,
+    detail: redactHome(o.detail),
+    ...(o.hint ? { hint: redactHome(o.hint) } : {}),
+  };
+}
+
+/**
+ * Build the JSON report payload from raw check outcomes. Pure function so the
+ * output schema can be locked down with a snapshot test — any future refactor
+ * that renames fields, drops `hint`, or reorders `checks[]` will fail that
+ * test before it reaches users or agents parsing the output.
+ *
+ * @param options.redact - when true, replaces HOME paths in `detail`/`hint`
+ *   with the literal `$HOME`. Default off so tests can assert on raw values;
+ *   the CLI turns it on for `--json` output.
+ */
+export function buildDoctorReport(outcomes: CheckOutcome[], options: { redact?: boolean } = {}) {
+  const checks = options.redact ? outcomes.map(redactOutcome) : outcomes;
+  return withMeta({
+    ok: checks.every((o) => o.ok),
+    platform: process.platform,
+    arch: process.arch,
+    checks,
+  });
 }
 
 export default defineCommand({
@@ -229,20 +269,13 @@ export default defineCommand({
     const allOk = outcomes.every((o) => o.ok);
 
     if (args.json) {
-      console.log(
-        JSON.stringify(
-          withMeta({
-            ok: allOk,
-            platform: process.platform,
-            arch: process.arch,
-            checks: outcomes,
-          }),
-          null,
-          2,
-        ),
-      );
-      // Non-zero exit so `hyperframes doctor --json` is usable as a CI gate.
-      if (!allOk) process.exitCode = 1;
+      // Exit code intentionally reflects command success, not environment
+      // health — `checkVersion` returns ok:false when an npm update is
+      // available, which would poison any CI pipeline doing
+      // `hyperframes doctor --json || fail` the next time a new version is
+      // published. Consumers who want a gate can do:
+      //   hyperframes doctor --json | jq -e '.ok' > /dev/null || handle_failure
+      console.log(JSON.stringify(buildDoctorReport(outcomes, { redact: true }), null, 2));
       return;
     }
 

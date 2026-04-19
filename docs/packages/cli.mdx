@@ -525,7 +525,19 @@ This is suppressed in CI environments, non-TTY shells, and when `HYPERFRAMES_NO_
       ◇  All checks passed
     ```
 
+    | Flag | Description |
+    |------|-------------|
+    | `--json` | Output as JSON (includes `_meta` envelope) |
+
     Verifies CLI version, Node.js, FFmpeg, FFprobe, Chrome, and Docker availability. If a newer CLI version is available, the version row shows an upgrade hint.
+
+    **CI gating.** `hyperframes doctor --json` always exits 0 on successful execution — the command succeeded if it produced valid output. Whether the environment is healthy is carried in the `ok` field of the payload, so a new CLI release (which flips `Version.ok` to `false`) never breaks your pipeline. Pipe through `jq` to gate on the payload instead:
+
+    ```bash
+    hyperframes doctor --json | jq -e '.ok' > /dev/null || handle_failure
+    ```
+
+    Paths in `detail` and `hint` are redacted in JSON mode — the user's home directory is replaced with the literal `$HOME` so output is safe to paste into bug reports and agent contexts.
 
     ### `info`
 
