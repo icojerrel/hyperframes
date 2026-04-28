@@ -3,7 +3,14 @@ import {
   buildStandaloneRootTimelineElement,
   mergeTimelineElementsPreservingDowngrades,
   resolveStandaloneRootCompositionSrc,
+  shouldIgnorePlaybackShortcutTarget,
 } from "./useTimelinePlayer";
+
+function mockTargetMatching(selectorNeedle: string): EventTarget {
+  return {
+    closest: (selector: string) => (selector.includes(selectorNeedle) ? ({} as Element) : null),
+  } as unknown as EventTarget;
+}
 
 describe("buildStandaloneRootTimelineElement", () => {
   it("includes selector and source metadata for standalone composition fallback clips", () => {
@@ -92,5 +99,19 @@ describe("mergeTimelineElementsPreservingDowngrades", () => {
         6,
       ),
     ).toEqual([{ id: "hero", tag: "div", start: 0, duration: 4, track: 0 }]);
+  });
+});
+
+describe("shouldIgnorePlaybackShortcutTarget", () => {
+  it("ignores focused toolbar buttons so Space can activate the button itself", () => {
+    expect(shouldIgnorePlaybackShortcutTarget(mockTargetMatching("button"))).toBe(true);
+  });
+
+  it("ignores the seek slider so ArrowRight reaches the slider key handler", () => {
+    expect(shouldIgnorePlaybackShortcutTarget(mockTargetMatching("[role='slider']"))).toBe(true);
+  });
+
+  it("allows non-interactive preview targets to use playback shortcuts", () => {
+    expect(shouldIgnorePlaybackShortcutTarget(mockTargetMatching("[data-missing]"))).toBe(false);
   });
 });
