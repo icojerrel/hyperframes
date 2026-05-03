@@ -101,19 +101,24 @@ npx hyperframes render --format webm                  # transparent WebM
 npx hyperframes render --docker                       # byte-identical
 ```
 
-| Flag           | Options               | Default                    | Notes                       |
-| -------------- | --------------------- | -------------------------- | --------------------------- |
-| `--output`     | path                  | renders/name_timestamp.mp4 | Output path                 |
-| `--fps`        | 24, 30, 60            | 30                         | 60fps doubles render time   |
-| `--quality`    | draft, standard, high | standard                   | draft for iterating         |
-| `--format`     | mp4, webm             | mp4                        | WebM supports transparency  |
-| `--workers`    | 1-8 or auto           | auto                       | Each spawns Chrome          |
-| `--docker`     | flag                  | off                        | Reproducible output         |
-| `--gpu`        | flag                  | off                        | GPU-accelerated encoding    |
-| `--strict`     | flag                  | off                        | Fail on lint errors         |
-| `--strict-all` | flag                  | off                        | Fail on errors AND warnings |
+| Flag                 | Options               | Default                    | Notes                                                              |
+| -------------------- | --------------------- | -------------------------- | ------------------------------------------------------------------ |
+| `--output`           | path                  | renders/name_timestamp.mp4 | Output path                                                        |
+| `--fps`              | 24, 30, 60            | 30                         | 60fps doubles render time                                          |
+| `--quality`          | draft, standard, high | standard                   | draft for iterating                                                |
+| `--format`           | mp4, webm             | mp4                        | WebM supports transparency                                         |
+| `--workers`          | 1-8 or auto           | auto                       | Each spawns Chrome                                                 |
+| `--docker`           | flag                  | off                        | Reproducible output                                                |
+| `--gpu`              | flag                  | off                        | GPU-accelerated encoding                                           |
+| `--strict`           | flag                  | off                        | Fail on lint errors                                                |
+| `--strict-all`       | flag                  | off                        | Fail on errors AND warnings                                        |
+| `--variables`        | JSON object           | —                          | Override variable values declared in `data-composition-variables`  |
+| `--variables-file`   | path                  | —                          | JSON file with variable values (alternative to `--variables`)      |
+| `--strict-variables` | flag                  | off                        | Fail render on undeclared keys or type mismatches in `--variables` |
 
 **Quality guidance:** `draft` while iterating, `standard` for review, `high` for final delivery.
+
+**Parametrized renders:** declare variables on `<html data-composition-variables='[...]'>` and read them inside the composition with `window.__hyperframes.getVariables()`. Override at render time with `--variables '{"title":"Q4 Report"}'`. Missing keys fall through to declared defaults, so the same composition runs unchanged in dev preview and in production renders. See the `hyperframes` skill for the full pattern.
 
 ## Transcription
 

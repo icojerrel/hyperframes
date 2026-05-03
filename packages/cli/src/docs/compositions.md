@@ -26,14 +26,33 @@ Use `npx hyperframes compositions` to see all compositions in a project.
 
 ## Variables
 
-HyperFrames does not automatically bind `data-var-*` attributes into your composition DOM.
+Declare variables on the composition's `<html>` root, then read them inside any composition script with `window.__hyperframes.getVariables()`. Override per-instance via `data-variable-values` on the host element, or at render time via `npx hyperframes render --variables '{...}'`.
 
 ```html
-<div
-  data-composition-id="card"
-  data-composition-src="compositions/card.html"
-  data-variable-values='{"title":"Hello","color":"#ff4d4f"}'
-></div>
+<!-- compositions/card.html -->
+<html data-composition-variables='[
+  {"id":"title","type":"string","label":"Title","default":"Hello"},
+  {"id":"color","type":"color","label":"Color","default":"#111827"}
+]'>
+  <body>
+    <div data-composition-id="card" data-width="1920" data-height="1080">
+      <h1 class="title"></h1>
+      <script>
+        const { title, color } = window.__hyperframes.getVariables();
+        document.querySelector(".title").textContent = title;
+        document.querySelector(".title").style.color = color;
+      </script>
+    </div>
+  </body>
+</html>
 ```
 
-Read `data-variable-values` inside the nested composition and apply the values in your own script. Variable metadata for tooling is declared separately via `data-composition-variables` and read with `extractCompositionMetadata()`.
+```html
+<!-- index.html — embed twice with different per-instance values -->
+<div data-composition-id="card-pro" data-composition-src="compositions/card.html"
+     data-variable-values='{"title":"Pro","color":"#ff4d4f"}'></div>
+<div data-composition-id="card-enterprise" data-composition-src="compositions/card.html"
+     data-variable-values='{"title":"Enterprise","color":"#22c55e"}'></div>
+```
+
+The runtime layers `data-variable-values` over the sub-comp's declared defaults on a per-instance basis. The same `getVariables()` call works at the top level too — the CLI flag `--variables` provides the override, declared `default`s fall through for missing keys.
