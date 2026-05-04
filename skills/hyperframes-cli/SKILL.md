@@ -101,19 +101,24 @@ npx hyperframes render --format webm                  # transparent WebM
 npx hyperframes render --docker                       # byte-identical
 ```
 
-| Flag           | Options               | Default                    | Notes                       |
-| -------------- | --------------------- | -------------------------- | --------------------------- |
-| `--output`     | path                  | renders/name_timestamp.mp4 | Output path                 |
-| `--fps`        | 24, 30, 60            | 30                         | 60fps doubles render time   |
-| `--quality`    | draft, standard, high | standard                   | draft for iterating         |
-| `--format`     | mp4, webm             | mp4                        | WebM supports transparency  |
-| `--workers`    | 1-8 or auto           | auto                       | Each spawns Chrome          |
-| `--docker`     | flag                  | off                        | Reproducible output         |
-| `--gpu`        | flag                  | off                        | GPU-accelerated encoding    |
-| `--strict`     | flag                  | off                        | Fail on lint errors         |
-| `--strict-all` | flag                  | off                        | Fail on errors AND warnings |
+| Flag                 | Options               | Default                    | Notes                                                              |
+| -------------------- | --------------------- | -------------------------- | ------------------------------------------------------------------ |
+| `--output`           | path                  | renders/name_timestamp.mp4 | Output path                                                        |
+| `--fps`              | 24, 30, 60            | 30                         | 60fps doubles render time                                          |
+| `--quality`          | draft, standard, high | standard                   | draft for iterating                                                |
+| `--format`           | mp4, webm             | mp4                        | WebM supports transparency                                         |
+| `--workers`          | 1-8 or auto           | auto                       | Each spawns Chrome                                                 |
+| `--docker`           | flag                  | off                        | Reproducible output                                                |
+| `--gpu`              | flag                  | off                        | GPU-accelerated encoding                                           |
+| `--strict`           | flag                  | off                        | Fail on lint errors                                                |
+| `--strict-all`       | flag                  | off                        | Fail on errors AND warnings                                        |
+| `--variables`        | JSON object           | —                          | Override variable values declared in `data-composition-variables`  |
+| `--variables-file`   | path                  | —                          | JSON file with variable values (alternative to `--variables`)      |
+| `--strict-variables` | flag                  | off                        | Fail render on undeclared keys or type mismatches in `--variables` |
 
 **Quality guidance:** `draft` while iterating, `standard` for review, `high` for final delivery.
+
+**Parametrized renders:** the composition declares its variables on the `<html>` root with **`data-composition-variables`** — a JSON **array of declarations** (`{id, type, label, default}` per entry) that defines the schema. Scripts inside read the resolved values via `window.__hyperframes.getVariables()`. The CLI **`--variables '{"title":"Q4 Report"}'`** is a JSON **object keyed by id** that overrides those declared defaults for one render; missing keys fall through, so the same composition runs unchanged in dev preview and in production. (Sub-comp hosts can also override per-instance with **`data-variable-values`** — same object shape, scoped to one mount of the sub-composition. See the `hyperframes` skill for the full pattern.)
 
 ## Transcription
 
