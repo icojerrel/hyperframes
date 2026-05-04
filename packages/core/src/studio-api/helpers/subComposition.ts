@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseHTML } from "linkedom";
-import {
-  rewriteAssetPaths,
-  rewriteCssAssetUrls,
-  rewriteInlineStyleAssetUrls,
-} from "../../compiler/rewriteSubCompPaths.js";
+import { rewriteAssetPaths, rewriteCssAssetUrls } from "../../compiler/rewriteSubCompPaths.js";
 
 /**
  * Build a standalone HTML page for a sub-composition.
@@ -38,14 +34,6 @@ export function buildSubCompositionHtml(
     (el: Element, attr: string) => el.getAttribute(attr),
     (el: Element, attr: string, value: string) => {
       el.setAttribute(attr, value);
-    },
-  );
-  rewriteInlineStyleAssetUrls(
-    contentDoc.querySelectorAll("[style]"),
-    compPath,
-    (el: Element) => el.getAttribute("style"),
-    (el: Element, value: string) => {
-      el.setAttribute("style", value);
     },
   );
   for (const styleEl of contentDoc.querySelectorAll("style")) {

@@ -233,7 +233,7 @@ export function getTimelineEditCapabilities(input: {
   const hasFiniteDuration = Number.isFinite(input.duration) && input.duration > 0;
   const hasDeterministicWindow = isDeterministicTimelineWindow(input);
   return {
-    canMove: canPatch && (hasDeterministicWindow || hasFiniteDuration),
+    canMove: canPatch && hasDeterministicWindow,
     canTrimEnd: canPatch && hasFiniteDuration && hasDeterministicWindow,
     canTrimStart: canPatch && hasFiniteDuration && canOffsetTrimClipStart(input),
   };
@@ -273,6 +273,7 @@ export function buildClipRangeSelection(
     anchorY: anchor.anchorY,
   };
 }
+
 export function buildTimelineAgentPrompt({
   rangeStart,
   rangeEnd,
@@ -346,6 +347,7 @@ export function buildTimelineElementAgentPrompt(element: {
 
   return lines.join("\n");
 }
+
 export function formatTimelineAttributeNumber(value: number): string {
   return Number(roundToCentiseconds(value).toFixed(2)).toString();
 }

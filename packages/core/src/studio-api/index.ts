@@ -4,7 +4,3 @@ export { isSafePath, walkDir } from "./helpers/safePath.js";
 export { getMimeType, MIME_TYPES } from "./helpers/mime.js";
 export { buildSubCompositionHtml } from "./helpers/subComposition.js";
 export { getElementScreenshotClip, type ScreenshotClip } from "./helpers/screenshotClip.js";
-export {
-  createStudioManualEditsRenderBodyScript,
-  type StudioManualEditsRenderScriptOptions,
-} from "./helpers/manualEditsRenderScript.js";

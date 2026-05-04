@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  rewriteAssetPath,
-  rewriteCssAssetUrls,
-  rewriteInlineStyleAssetUrls,
-} from "./rewriteSubCompPaths.js";
+import { rewriteAssetPath, rewriteCssAssetUrls } from "./rewriteSubCompPaths.js";
 
 describe("rewriteAssetPath", () => {
   it("rewrites `../` against the sub-composition dir", () => {
@@ -39,20 +35,5 @@ describe("rewriteAssetPath", () => {
     expect(out).toContain(`url("fonts/brand.woff2")`);
     expect(out).not.toMatch(/\\/);
     expect(out).not.toMatch(/:\\/);
-  });
-
-  it("rewrites CSS urls inside inline style attributes", () => {
-    const elements = [{ style: `background-image: url("../cover.png")` }];
-
-    rewriteInlineStyleAssetUrls(
-      elements,
-      "compositions/scene.html",
-      (el) => el.style,
-      (el, value) => {
-        el.style = value;
-      },
-    );
-
-    expect(elements[0]?.style).toBe(`background-image: url("cover.png")`);
   });
 });

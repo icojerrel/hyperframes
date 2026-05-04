@@ -2,17 +2,12 @@ import { memo, useState, useRef, useEffect } from "react";
 import { RenderQueueItem } from "./RenderQueueItem";
 import type { RenderJob } from "./useRenderQueue";
 
-type StartRenderHandler = (
-  format: "mp4" | "webm" | "mov",
-  quality: "draft" | "standard" | "high",
-) => void | Promise<void>;
-
 interface RenderQueueProps {
   jobs: RenderJob[];
   projectId: string;
   onDelete: (jobId: string) => void;
   onClearCompleted: () => void;
-  onStartRender: StartRenderHandler;
+  onStartRender: (format: "mp4" | "webm" | "mov", quality: "draft" | "standard" | "high") => void;
   isRendering: boolean;
 }
 
@@ -96,7 +91,7 @@ function FormatExportButton({
   onStartRender,
   isRendering,
 }: {
-  onStartRender: StartRenderHandler;
+  onStartRender: (format: "mp4" | "webm" | "mov", quality: "draft" | "standard" | "high") => void;
   isRendering: boolean;
 }) {
   const [format, setFormat] = useState<"mp4" | "webm" | "mov">("mp4");
@@ -134,9 +129,7 @@ function FormatExportButton({
         <option value="webm">WebM</option>
       </select>
       <button
-        onClick={() => {
-          void onStartRender(format, quality);
-        }}
+        onClick={() => onStartRender(format, quality)}
         disabled={isRendering}
         className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-r bg-studio-accent text-[#09090B] hover:brightness-110 transition-colors disabled:opacity-50"
       >

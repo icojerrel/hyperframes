@@ -13,7 +13,6 @@ import { createProjectWatcher, type ProjectWatcher } from "./fileWatcher.js";
 import { loadRuntimeSource } from "./runtimeSource.js";
 import { VERSION as version } from "../version.js";
 import {
-  createStudioManualEditsRenderBodyScript,
   createStudioApi,
   getMimeType,
   type StudioApiAdapter,
@@ -22,8 +21,6 @@ import {
 } from "@hyperframes/core/studio-api";
 import { getElementScreenshotClip } from "@hyperframes/core/studio-api/screenshot-clip";
 import type { ScreenshotClip } from "@hyperframes/core/studio-api/screenshot-clip";
-
-const STUDIO_MANUAL_EDITS_PATH = ".hyperframes/studio-manual-edits.json";
 
 // ── Path resolution ─────────────────────────────────────────────────────────
 
@@ -78,38 +75,6 @@ function resolveRuntimePath(): string {
   );
   if (existsSync(devPath)) return devPath;
   return builtPath;
-}
-
-function readStudioManualEditManifestContent(projectDir: string): string {
-  const manifestPath = join(projectDir, STUDIO_MANUAL_EDITS_PATH);
-  if (!existsSync(manifestPath)) return "";
-  try {
-    return readFileSync(manifestPath, "utf-8");
-  } catch {
-    return "";
-  }
-}
-
-async function applyStudioManualEditsToThumbnailPage(
-  page: import("puppeteer-core").Page,
-  manifestContent: string,
-  activeCompositionPath: string,
-): Promise<void> {
-  const script = createStudioManualEditsRenderBodyScript(manifestContent, {
-    activeCompositionPath,
-  });
-  if (!script) return;
-  await page.addScriptTag({ content: script });
-}
-
-async function reapplyStudioManualEditsToThumbnailPage(
-  page: import("puppeteer-core").Page,
-): Promise<void> {
-  await page.evaluate(() => {
-    const apply = (window as Window & { __hfStudioManualEditsApply?: () => number })
-      .__hfStudioManualEditsApply;
-    if (typeof apply === "function") apply();
-  });
 }
 
 // ── Shared thumbnail browser (singleton per process) ────────────────────────
@@ -233,13 +198,10 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
             // Continue without — acquireBrowser will try its own resolution
           }
 
-          const manifestContent = readStudioManualEditManifestContent(opts.project.dir);
-          const manualEditsRenderScript = createStudioManualEditsRenderBodyScript(manifestContent);
           const job = createRenderJob({
             fps: opts.fps as 24 | 30 | 60,
             quality: opts.quality as "draft" | "standard" | "high",
             format: opts.format,
-            ...(manualEditsRenderScript ? { renderBodyScripts: [manualEditsRenderScript] } : {}),
           });
           const startTime = Date.now();
           const onProgress = (j: { progress: number; currentStage?: string }) => {
@@ -296,14 +258,11 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
             win.__timeline.seek(t);
           }
         }, opts.seekTime);
-        const manifestContent = readStudioManualEditManifestContent(opts.project.dir);
-        await applyStudioManualEditsToThumbnailPage(page, manifestContent, opts.compPath);
         // Let the seek render settle.
         await new Promise((r) => setTimeout(r, 200));
-        await reapplyStudioManualEditsToThumbnailPage(page);
         let clip: ScreenshotClip | undefined;
         if (opts.selector) {
-          clip = await page.evaluate(getElementScreenshotClip, opts.selector, opts.selectorIndex);
+          clip = await page.evaluate(getElementScreenshotClip, opts.selector);
         }
         const screenshot = (await page.screenshot(
           opts.format === "png"
@@ -359,8 +318,8 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
 
   app.get("/api/events", (c) => {
     return streamSSE(c, async (stream) => {
-      const listener = (path: string) => {
-        stream.writeSSE({ event: "file-change", data: JSON.stringify({ path }) }).catch(() => {});
+      const listener = () => {
+        stream.writeSSE({ event: "file-change", data: "{}" }).catch(() => {});
       };
       watcher.addListener(listener);
       while (true) {

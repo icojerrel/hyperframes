@@ -2,7 +2,6 @@ import { memo, useState, useCallback, useRef } from "react";
 import { VideoFrameThumbnail } from "../ui/VideoFrameThumbnail";
 import { MEDIA_EXT, IMAGE_EXT, VIDEO_EXT, AUDIO_EXT } from "../../utils/mediaTypes";
 import { TIMELINE_ASSET_MIME } from "../../utils/timelineAssetDrop";
-import { copyTextToClipboard } from "../../utils/clipboard";
 
 interface AssetsTabProps {
   projectId: string;
@@ -299,10 +298,12 @@ export const AssetsTab = memo(function AssetsTab({
   );
 
   const handleCopyPath = useCallback(async (path: string) => {
-    const copied = await copyTextToClipboard(path);
-    if (copied) {
+    try {
+      await navigator.clipboard.writeText(path);
       setCopiedPath(path);
       setTimeout(() => setCopiedPath(null), 1500);
+    } catch {
+      // ignore
     }
   }, []);
 

@@ -3,7 +3,6 @@ import { useMountEffect } from "../../hooks/useMountEffect";
 import { usePlayerStore } from "../store/playerStore";
 import { formatTime } from "../lib/time";
 import { buildPromptCopyText, buildTimelineAgentPrompt } from "./timelineEditing";
-import { copyTextToClipboard } from "../../utils/clipboard";
 
 interface EditPopoverProps {
   rangeStart: number;
@@ -63,8 +62,16 @@ export function EditPopover({ rangeStart, rangeEnd, anchorX, anchorY, onClose }:
   }, [start, end, elementsInRange, prompt]);
 
   const handleCopy = useCallback(async () => {
-    const copied = await copyTextToClipboard(buildClipboardText());
-    if (!copied) return;
+    try {
+      await navigator.clipboard.writeText(buildClipboardText());
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = buildClipboardText();
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
     setCopiedAgentPrompt(true);
     setTimeout(() => {
       setCopiedAgentPrompt(false);
@@ -75,8 +82,16 @@ export function EditPopover({ rangeStart, rangeEnd, anchorX, anchorY, onClose }:
   const handleCopyPrompt = useCallback(async () => {
     const promptText = buildPromptCopyText(prompt);
     if (!promptText) return;
-    const copied = await copyTextToClipboard(promptText);
-    if (!copied) return;
+    try {
+      await navigator.clipboard.writeText(promptText);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = promptText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
     setCopiedPromptOnly(true);
     setTimeout(() => {
       setCopiedPromptOnly(false);

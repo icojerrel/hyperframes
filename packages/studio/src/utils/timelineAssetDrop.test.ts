@@ -4,7 +4,6 @@ import {
   buildTimelineAssetInsertHtml,
   getTimelineAssetKind,
   insertTimelineAssetIntoSource,
-  resolveTimelineAssetInitialGeometry,
   resolveTimelineAssetSrc,
 } from "./timelineAssetDrop";
 
@@ -20,21 +19,17 @@ describe("getTimelineAssetKind", () => {
 
 describe("buildTimelineAssetInsertHtml", () => {
   it("builds an image clip with explicit timing and track", () => {
-    const html = buildTimelineAssetInsertHtml({
-      id: "photo_asset",
-      assetPath: "assets/photo.png",
-      kind: "image",
-      start: 1.25,
-      duration: 3,
-      track: 2,
-      zIndex: 4,
-      geometry: { left: 0, top: 0, width: 1280, height: 720 },
-    });
-
-    expect(html).toContain('img id="photo_asset"');
-    expect(html).toContain("left: 0px");
-    expect(html).toContain("width: 1280px");
-    expect(html).not.toContain("inset:");
+    expect(
+      buildTimelineAssetInsertHtml({
+        id: "photo_asset",
+        assetPath: "assets/photo.png",
+        kind: "image",
+        start: 1.25,
+        duration: 3,
+        track: 2,
+        zIndex: 4,
+      }),
+    ).toContain('img id="photo_asset"');
   });
 
   it("builds an audio clip without visual layout styles", () => {
@@ -49,21 +44,6 @@ describe("buildTimelineAssetInsertHtml", () => {
     });
     expect(html).toContain("<audio");
     expect(html).not.toContain("object-fit");
-  });
-});
-
-describe("resolveTimelineAssetInitialGeometry", () => {
-  it("uses the target composition dimensions for visual media", () => {
-    expect(
-      resolveTimelineAssetInitialGeometry(
-        `<div data-composition-id="main" data-width="330" data-height="228"></div>`,
-      ),
-    ).toEqual({
-      left: 0,
-      top: 0,
-      width: 330,
-      height: 228,
-    });
   });
 });
 

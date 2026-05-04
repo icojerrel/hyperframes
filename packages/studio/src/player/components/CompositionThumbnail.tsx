@@ -7,7 +7,6 @@ interface CompositionThumbnailProps {
   labelColor: string;
   accentColor?: string;
   selector?: string;
-  selectorIndex?: number;
   seekTime?: number;
   duration?: number;
   width?: number;
@@ -15,38 +14,7 @@ interface CompositionThumbnailProps {
 }
 
 const CLIP_HEIGHT = 66;
-const THUMBNAIL_URL_VERSION = "v3";
-
-export function buildCompositionThumbnailUrl({
-  previewUrl,
-  seekTime = 2,
-  duration = 5,
-  selector,
-  selectorIndex,
-  origin,
-}: {
-  previewUrl: string;
-  seekTime?: number;
-  duration?: number;
-  selector?: string;
-  selectorIndex?: number;
-  origin: string;
-}): string {
-  const thumbnailBase = previewUrl
-    .replace("/preview/comp/", "/thumbnail/")
-    .replace(/\/preview$/, "/thumbnail/index.html");
-  const midTime = seekTime + duration / 2;
-  const thumbnailUrl = new URL(thumbnailBase, origin);
-  thumbnailUrl.searchParams.set("t", midTime.toFixed(2));
-  thumbnailUrl.searchParams.set("v", THUMBNAIL_URL_VERSION);
-  if (selector) {
-    thumbnailUrl.searchParams.set("selector", selector);
-    if (selectorIndex != null && selectorIndex > 0) {
-      thumbnailUrl.searchParams.set("selectorIndex", String(selectorIndex));
-    }
-  }
-  return thumbnailUrl.toString();
-}
+const THUMBNAIL_URL_VERSION = "v2";
 
 export const CompositionThumbnail = memo(function CompositionThumbnail({
   previewUrl,
@@ -54,7 +22,6 @@ export const CompositionThumbnail = memo(function CompositionThumbnail({
   labelColor,
   accentColor = "#6B7280",
   selector,
-  selectorIndex,
   seekTime = 2,
   duration = 5,
 }: CompositionThumbnailProps) {
@@ -81,14 +48,15 @@ export const CompositionThumbnail = memo(function CompositionThumbnail({
     roRef.current?.disconnect();
   });
 
-  const url = buildCompositionThumbnailUrl({
-    previewUrl,
-    seekTime,
-    duration,
-    selector,
-    selectorIndex,
-    origin: window.location.origin,
-  });
+  const thumbnailBase = previewUrl
+    .replace("/preview/comp/", "/thumbnail/")
+    .replace(/\/preview$/, "/thumbnail/index.html");
+  const midTime = seekTime + duration / 2;
+  const thumbnailUrl = new URL(thumbnailBase, window.location.origin);
+  thumbnailUrl.searchParams.set("t", midTime.toFixed(2));
+  thumbnailUrl.searchParams.set("v", THUMBNAIL_URL_VERSION);
+  if (selector) thumbnailUrl.searchParams.set("selector", selector);
+  const url = thumbnailUrl.toString();
   const frameW = Math.max(48, Math.round(CLIP_HEIGHT * aspect));
   const frameCount = containerWidth > 0 ? Math.max(1, Math.ceil(containerWidth / frameW)) : 1;
 
@@ -98,7 +66,7 @@ export const CompositionThumbnail = memo(function CompositionThumbnail({
         src={url}
         alt=""
         draggable={false}
-        loading="eager"
+        loading="lazy"
         onLoad={(e) => {
           const img = e.currentTarget;
           if (img.naturalWidth > 0 && img.naturalHeight > 0) {
