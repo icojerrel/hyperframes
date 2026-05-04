@@ -309,16 +309,25 @@ async function runPipeline(
   return processed;
 }
 
-function waitForExit(
+export function waitForExit(
   proc: ReturnType<typeof spawn>,
   label: string,
   getStderr: () => string,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     proc.on("error", reject);
-    proc.on("exit", (code) => {
-      if (code === 0 || code === null) resolve();
-      else reject(new Error(`${label} exited with code ${code}: ${getStderr().slice(-400)}`));
+    // Per Node docs the exit callback is (code, signal): on a normal exit
+    // `code` is the numeric exit status and `signal` is null; on a
+    // signal-killed exit `code` is null and `signal` is the signal name.
+    // Treating null-code as success would silently report SIGTERM/SIGKILL
+    // as a successful render.
+    proc.on("exit", (code, signal) => {
+      if (code === 0 && !signal) {
+        resolve();
+        return;
+      }
+      const cause = signal ? `killed by ${signal}` : `exited with code ${code}`;
+      reject(new Error(`${label} ${cause}: ${getStderr().slice(-400)}`));
     });
   });
 }

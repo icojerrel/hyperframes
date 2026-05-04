@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { inferOutputFormat, inferInputKind, buildEncoderArgs } from "./pipeline.js";
+import { EventEmitter } from "node:events";
+import type { spawn } from "node:child_process";
+import { inferOutputFormat, inferInputKind, buildEncoderArgs, waitForExit } from "./pipeline.js";
 
 describe("background-removal/pipeline — inferOutputFormat", () => {
   it("maps .webm → webm", () => {
@@ -63,5 +65,44 @@ describe("background-removal/pipeline — buildEncoderArgs", () => {
     expect(args[sIdx + 1]).toBe("640x480");
     const rIdx = args.indexOf("-r");
     expect(args[rIdx + 1]).toBe("24");
+  });
+});
+
+// Regression: a previous version of waitForExit treated `code === null` as
+// success. Per Node's child_process docs, that's the signal-killed case —
+// reporting it as success means a SIGTERM/SIGKILL'd ffmpeg encoder produces
+// a "successful" render with a missing or truncated output file.
+describe("background-removal/pipeline — waitForExit signal handling", () => {
+  function fakeProc(): ReturnType<typeof spawn> {
+    return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+  }
+
+  it("resolves on a clean exit (code=0, signal=null)", async () => {
+    const proc = fakeProc();
+    const promise = waitForExit(proc, "ffmpeg encoder", () => "");
+    proc.emit("exit", 0, null);
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it("rejects when killed by signal (code=null, signal='SIGTERM')", async () => {
+    const proc = fakeProc();
+    const promise = waitForExit(proc, "ffmpeg encoder", () => "tail of stderr");
+    proc.emit("exit", null, "SIGTERM");
+    await expect(promise).rejects.toThrow(/killed by SIGTERM/);
+    await expect(promise).rejects.toThrow(/tail of stderr/);
+  });
+
+  it("rejects on non-zero exit code", async () => {
+    const proc = fakeProc();
+    const promise = waitForExit(proc, "ffmpeg encoder", () => "");
+    proc.emit("exit", 1, null);
+    await expect(promise).rejects.toThrow(/exited with code 1/);
+  });
+
+  it("rejects on SIGKILL", async () => {
+    const proc = fakeProc();
+    const promise = waitForExit(proc, "ffmpeg encoder", () => "");
+    proc.emit("exit", null, "SIGKILL");
+    await expect(promise).rejects.toThrow(/killed by SIGKILL/);
   });
 });

@@ -11,8 +11,12 @@ import { ensureModel, selectProviders, type Device, type ModelId } from "./manag
 
 const INPUT_SIZE = 320;
 const INPUT_PLANE = INPUT_SIZE * INPUT_SIZE;
-const MEAN = [0.485, 0.456, 0.406] as const;
-const STD = [1.0, 1.0, 1.0] as const;
+
+// Must match rembg's U2netHumanSegSession.predict — ImageNet mean/std, NOT the
+// (1.0, 1.0, 1.0) std used by the general-purpose u2net session.
+// https://github.com/danielgatis/rembg/blob/main/rembg/sessions/u2net_human_seg.py#L33
+export const MEAN = [0.485, 0.456, 0.406] as const;
+export const STD = [0.229, 0.224, 0.225] as const;
 
 type Sharp = typeof sharpType;
 interface OrtModule {
