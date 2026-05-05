@@ -10,6 +10,8 @@ import {
   extractAllVideoFrames,
   createFrameLookupTable,
   resolveProjectRelativeSrc,
+  codecMayHaveAlpha,
+  decoderForCodec,
   type VideoElement,
   type ExtractedFrames,
 } from "./videoFrameExtractor.js";
@@ -33,6 +35,41 @@ const HAS_FFMPEG = spawnSync("ffmpeg", ["-version"]).status === 0;
 // <video>'s first decoded frame for the whole clip duration. The resolver
 // now mirrors browser semantics by stripping leading `..` segments as a
 // fallback when the literal join doesn't exist.
+// Codec-based alpha defaulting is the deeper fix for the
+// `alpha_mode`-vs-`ALPHA_MODE` tag-detection bug (see ffprobe.test.ts). The
+// extractor uses these helpers to decide:
+//   1. whether to force the alpha-aware decoder (libvpx-vp9)
+//   2. whether to default the cached frame format to PNG (with alpha) vs JPG
+// The "default to capable" trade is small file-size growth on opaque VP9
+// content for correctness on alpha-having content even when the sidecar tag
+// is missing or muxed with the wrong case.
+describe("codec alpha capability", () => {
+  it("flags VP9, VP8, and ProRes as alpha-capable", () => {
+    expect(codecMayHaveAlpha("vp9")).toBe(true);
+    expect(codecMayHaveAlpha("VP9")).toBe(true);
+    expect(codecMayHaveAlpha("vp8")).toBe(true);
+    expect(codecMayHaveAlpha("prores")).toBe(true);
+  });
+
+  it("does not flag h264 / h265 / mpeg4 (no alpha in their bitstreams)", () => {
+    expect(codecMayHaveAlpha("h264")).toBe(false);
+    expect(codecMayHaveAlpha("h265")).toBe(false);
+    expect(codecMayHaveAlpha("hevc")).toBe(false);
+    expect(codecMayHaveAlpha("mpeg4")).toBe(false);
+  });
+
+  it("treats undefined / empty input as non-alpha", () => {
+    expect(codecMayHaveAlpha(undefined)).toBe(false);
+    expect(codecMayHaveAlpha("")).toBe(false);
+  });
+
+  it("returns the alpha-aware decoder name for VP9 and VP8", () => {
+    expect(decoderForCodec("vp9")).toBe("libvpx-vp9");
+    expect(decoderForCodec("VP9")).toBe("libvpx-vp9");
+    expect(decoderForCodec("vp8")).toBe("libvpx");
+  });
+});
+
 describe("resolveProjectRelativeSrc — sub-composition path clamping", () => {
   let tmp: string;
 

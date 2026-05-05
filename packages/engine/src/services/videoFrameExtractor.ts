@@ -230,8 +230,17 @@ export async function extractVideoFramesRange(
   if (isHdr && isMacOS) {
     args.push("-hwaccel", "videotoolbox");
   }
-  if (metadata.hasAlpha && metadata.videoCodec === "vp9") {
-    args.push("-c:v", "libvpx-vp9");
+  // Always force the alpha-aware decoder on codecs that can carry alpha. The
+  // alternative — gating on `metadata.hasAlpha` — relies on tag detection that
+  // has at least three known failure modes: case-sensitivity across ffmpeg
+  // versions (`alpha_mode` vs `ALPHA_MODE`), missing tags from older muxers,
+  // and mp4-as-webm rewraps that drop the sidecar. A wrong negative there
+  // silently strips alpha during decode and the bug doesn't surface until
+  // the rendered video is missing layers. Codec-based default has no such
+  // ambiguity: libvpx-vp9 reads the alpha sidecar when present and decodes
+  // normally when it isn't.
+  if (codecMayHaveAlpha(metadata.videoCodec)) {
+    args.push("-c:v", decoderForCodec(metadata.videoCodec));
   }
   args.push("-ss", String(startTime), "-i", videoPath, "-t", String(duration));
 
@@ -398,9 +407,31 @@ function resolveSegmentDuration(
   return sourceRemaining > 0 ? sourceRemaining : metadata.durationSeconds;
 }
 
+/**
+ * Codecs whose bitstream is allowed to carry an alpha channel. Default the
+ * extraction path to PNG output for these regardless of `metadata.hasAlpha`
+ * so a missed sidecar tag doesn't silently strip transparency. Opaque content
+ * encoded in one of these codecs pays a small file-size cost on the cached
+ * frames but stays correct on the rare case where alpha IS present and the
+ * tag was missed.
+ */
+const ALPHA_CAPABLE_CODECS = new Set(["vp9", "vp8", "prores"]);
+
+export function codecMayHaveAlpha(codec: string | undefined): boolean {
+  return ALPHA_CAPABLE_CODECS.has((codec ?? "").toLowerCase());
+}
+
+export function decoderForCodec(codec: string | undefined): string {
+  const c = (codec ?? "").toLowerCase();
+  if (c === "vp9") return "libvpx-vp9";
+  if (c === "vp8") return "libvpx";
+  return c;
+}
+
 function resolveFrameFormat(metadata: VideoMetadata, requested?: "jpg" | "png"): CacheFrameFormat {
   if (requested) return requested;
-  return metadata.hasAlpha ? "png" : "jpg";
+  if (metadata.hasAlpha || codecMayHaveAlpha(metadata.videoCodec)) return "png";
+  return "jpg";
 }
 
 /**
