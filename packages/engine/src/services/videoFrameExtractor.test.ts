@@ -9,6 +9,7 @@ import {
   parseImageElements,
   extractAllVideoFrames,
   createFrameLookupTable,
+  resolveProjectRelativeSrc,
   type VideoElement,
   type ExtractedFrames,
 } from "./videoFrameExtractor.js";
@@ -22,6 +23,67 @@ import { runFfmpeg } from "../utils/runFfmpeg.js";
 // below run too — they exercise the extractor in isolation against a
 // synthesized VFR fixture.
 const HAS_FFMPEG = spawnSync("ffmpeg", ["-version"]).status === 0;
+
+// Regression: a long-standing footgun where `<video src="../assets/foo">`
+// inside a sub-composition silently dropped the video from extraction. The
+// browser's URL resolver clamps `..` at the served origin's root (so the
+// page renders fine in the studio), but `path.join(projectDir, "../assets/foo")`
+// normalizes to <parentOfProjectDir>/assets/foo, which doesn't exist. Result:
+// no extracted frames, no per-frame injection, the rendered output shows the
+// <video>'s first decoded frame for the whole clip duration. The resolver
+// now mirrors browser semantics by stripping leading `..` segments as a
+// fallback when the literal join doesn't exist.
+describe("resolveProjectRelativeSrc — sub-composition path clamping", () => {
+  let tmp: string;
+
+  beforeAll(() => {
+    tmp = mkdtempSync(join(tmpdir(), "hf-resolver-"));
+    mkdirSync(join(tmp, "project", "assets"), { recursive: true });
+    // Empty file is enough for existsSync — this test is about path resolution.
+    require("node:fs").writeFileSync(join(tmp, "project", "assets", "foo.mp4"), "");
+  });
+  afterAll(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("returns the literal join when the file exists at projectDir/src", () => {
+    const projectDir = join(tmp, "project");
+    expect(resolveProjectRelativeSrc("assets/foo.mp4", projectDir)).toBe(
+      join(projectDir, "assets/foo.mp4"),
+    );
+  });
+
+  it("clamps a leading `../` (sub-comp authoring) so `../assets/foo.mp4` resolves to assets/foo.mp4", () => {
+    const projectDir = join(tmp, "project");
+    expect(resolveProjectRelativeSrc("../assets/foo.mp4", projectDir)).toBe(
+      join(projectDir, "assets/foo.mp4"),
+    );
+  });
+
+  it("clamps multiple leading `../../../` segments", () => {
+    const projectDir = join(tmp, "project");
+    expect(resolveProjectRelativeSrc("../../../assets/foo.mp4", projectDir)).toBe(
+      join(projectDir, "assets/foo.mp4"),
+    );
+  });
+
+  it("returns the (non-existent) base-dir path on miss so callers get a stable error message", () => {
+    const projectDir = join(tmp, "project");
+    expect(resolveProjectRelativeSrc("../assets/missing.mp4", projectDir)).toBe(
+      join(projectDir, "../assets/missing.mp4"),
+    );
+  });
+
+  it("prefers compiled-dir over base-dir when the file exists in both", () => {
+    const projectDir = join(tmp, "project");
+    const compiledDir = join(tmp, "compiled");
+    mkdirSync(join(compiledDir, "assets"), { recursive: true });
+    require("node:fs").writeFileSync(join(compiledDir, "assets", "foo.mp4"), "");
+    expect(resolveProjectRelativeSrc("assets/foo.mp4", projectDir, compiledDir)).toBe(
+      join(compiledDir, "assets/foo.mp4"),
+    );
+  });
+});
 
 describe("parseVideoElements", () => {
   it("parses videos without an id or data-start attribute", () => {

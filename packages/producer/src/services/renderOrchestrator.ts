@@ -33,6 +33,7 @@ import {
   type EngineConfig,
   resolveConfig,
   extractAllVideoFrames,
+  resolveProjectRelativeSrc,
   type ExtractedFrames,
   type ExtractionPhaseBreakdown,
   createFrameLookupTable,
@@ -2312,13 +2313,15 @@ export async function executeRenderJob(
     if (job.config.hdrMode !== "force-sdr" && composition.videos.length > 0) {
       await Promise.all(
         composition.videos.map(async (v) => {
-          let videoPath = v.src;
-          if (!videoPath.startsWith("/")) {
-            const fromCompiled = existsSync(join(compiledDir, videoPath))
-              ? join(compiledDir, videoPath)
-              : join(projectDir, videoPath);
-            videoPath = fromCompiled;
-          }
+          // Use the shared resolver so a `<video src="../assets/foo">` in a
+          // sub-composition resolves the same way the browser would (see
+          // resolveProjectRelativeSrc in videoFrameExtractor for the full
+          // explanation). Without this, the HDR probe silently no-ops on
+          // those videos and the downstream extraction bug shows up
+          // amplified — videos register but never extract.
+          const videoPath = v.src.startsWith("/")
+            ? v.src
+            : resolveProjectRelativeSrc(v.src, projectDir, compiledDir);
           if (!existsSync(videoPath)) return;
           const meta = await extractMediaMetadata(videoPath);
           if (isHdrColorSpace(meta.colorSpace)) {

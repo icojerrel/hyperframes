@@ -459,6 +459,37 @@ async function convertVfrToCfr(
   }
 }
 
+/**
+ * Resolve a relative `<video src>` to a filesystem path the way the browser
+ * resolves it as a URL. Browsers clamp `..` segments at the served origin's
+ * root; `path.join(projectDir, "../assets/foo")` does not. So a sub-comp
+ * `<video src="../assets/foo">` loads in the page (browser clamps to
+ * `<projectDir>/assets/foo`) but the filesystem-side resolver lands at
+ * `<parentOfProjectDir>/assets/foo` — file missing, extraction skipped,
+ * the rendered output shows the video's first frame for the whole clip.
+ * Mirror the clamp here.
+ *
+ * Returns the first existing candidate, or the base-dir join on miss so
+ * the caller's existsSync check produces a stable error path.
+ */
+export function resolveProjectRelativeSrc(
+  src: string,
+  baseDir: string,
+  compiledDir?: string,
+): string {
+  const candidates = [
+    compiledDir && join(compiledDir, src),
+    join(baseDir, src),
+    ...(src.startsWith("..")
+      ? (() => {
+          const clamped = src.replace(/^(\.\.[\\/])+/, "");
+          return [compiledDir && join(compiledDir, clamped), join(baseDir, clamped)];
+        })()
+      : []),
+  ].filter(Boolean) as string[];
+  return candidates.find(existsSync) ?? join(baseDir, src);
+}
+
 export async function extractAllVideoFrames(
   videos: VideoElement[],
   baseDir: string,
@@ -496,9 +527,7 @@ export async function extractAllVideoFrames(
       // baseDir and produce duplicated, nonexistent paths
       // (e.g. C:\tmp\hf-vfr-test-X\C:\tmp\hf-vfr-test-X\vfr_screen.mp4).
       if (!isAbsolute(videoPath) && !isHttpUrl(videoPath)) {
-        const fromCompiled = compiledDir ? join(compiledDir, videoPath) : null;
-        videoPath =
-          fromCompiled && existsSync(fromCompiled) ? fromCompiled : join(baseDir, videoPath);
+        videoPath = resolveProjectRelativeSrc(video.src, baseDir, compiledDir);
       }
 
       if (isHttpUrl(videoPath)) {
@@ -508,6 +537,15 @@ export async function extractAllVideoFrames(
       }
 
       if (!existsSync(videoPath)) {
+        // Loud: silent miss leaves the rendered video frozen at frame 0 with
+        // no error in stdout — extremely confusing for authors.
+        process.stderr.write(
+          `[hyperframes:render] WARNING: video <${video.id}> src="${video.src}" ` +
+            `could not be resolved on disk (looked for ${videoPath}). ` +
+            `The rendered output will show this video's first frame for the entire clip duration. ` +
+            `If your <video> lives inside a sub-composition, prefer project-root-relative paths ` +
+            `(e.g. src="assets/foo.mp4") over "../assets/foo.mp4".\n`,
+        );
         errors.push({ videoId: video.id, error: `Video file not found: ${videoPath}` });
         continue;
       }
