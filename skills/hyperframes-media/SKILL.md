@@ -108,11 +108,66 @@ Remove the background from a video or image so the subject (typically a person �
 npx hyperframes remove-background subject.mp4 -o transparent.webm  # default: VP9 alpha WebM
 npx hyperframes remove-background subject.mp4 -o transparent.mov   # ProRes 4444 (editing)
 npx hyperframes remove-background portrait.jpg -o cutout.png       # single-image cutout
+npx hyperframes remove-background subject.mp4 -o subject.webm \
+  --background-output plate.webm                                   # both layers in one pass
 npx hyperframes remove-background subject.mp4 -o transparent.webm --device cpu
 npx hyperframes remove-background --info                           # detected providers
 ```
 
 Uses `u2net_human_seg` (MIT). First run downloads ~168 MB of weights to `~/.cache/hyperframes/background-removal/models/`.
+
+### Layer separation (`--background-output`)
+
+Pass `--background-output` (or `-b`) to emit a **second** transparent video alongside the cutout: same source RGB, alpha is `255 − mask` instead of `mask`. The cutout is the subject with a transparent background; the plate is the original surroundings with a transparent hole where the subject was.
+
+| File                             | Alpha is…                                                 | Use it for                                                      |
+| -------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| `-o subject.webm`                | The mask — subject opaque, background transparent         | Foreground layer, place on top                                  |
+| `--background-output plate.webm` | Inverse — surroundings opaque, subject region transparent | Bottom layer; put text or graphics between this and the subject |
+
+Both outputs share the same `--quality` preset and run from a single inference pass — encode cost roughly doubles, segmentation cost stays the same. Only valid for video inputs and `.webm`/`.mov` outputs.
+
+**Hole-cut plate, not an inpainted clean plate.** The subject region in `plate.webm` is fully transparent — composite something opaque under it to fill the hole. The single test for whether `--background-output` is the right tool: _will anything ever be visible through the subject's silhouette where the subject used to be?_
+
+| Use case                                                                            | Right tool                                                                         |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Text/graphics between the cutout and the plate (this command's reason for existing) | **Hole-cut** (`--background-output`)                                               |
+| Subject onto an unrelated scene                                                     | Just `subject.webm`; ignore the plate                                              |
+| Show the room _without_ the person, alone over no other content                     | **Clean plate** — needs an inpainter (LaMa, ProPainter, E2FGVI). Not this command. |
+| Replace the subject with a different subject                                        | **Clean plate** — same as above                                                    |
+
+If a user asks for "the room with the person removed" and intends to display it standalone, do **not** reach for `--background-output`. Tell them they need an inpainter.
+
+Typical layered composition (the canonical hole-cut use case):
+
+```html
+<!-- z=1 the inverse-alpha plate fills everything except the subject region -->
+<video
+  src="plate.webm"
+  data-start="0"
+  data-duration="6"
+  data-track-index="0"
+  muted
+  playsinline
+></video>
+
+<!-- z=2 graphics / text live between the two layers -->
+<h1 id="headline" style="z-index:2; ...">MAKE IT IN HYPERFRAMES</h1>
+
+<!-- z=3 the cutout floats the subject back over the headline -->
+<div class="cutout-wrap" style="position:absolute;inset:0;z-index:3">
+  <video
+    src="subject.webm"
+    data-start="0"
+    data-duration="6"
+    data-track-index="1"
+    muted
+    playsinline
+  ></video>
+</div>
+```
+
+This is functionally equivalent to the text-behind-subject pattern below, but you don't need the original `presenter.mp4` in the project — the plate replaces it. Useful when you want to ship just the two transparent layers and let the user drop arbitrary content between them.
 
 ### Output Format
 

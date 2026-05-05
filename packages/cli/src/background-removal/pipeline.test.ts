@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { EventEmitter } from "node:events";
 import type { spawn } from "node:child_process";
-import { inferOutputFormat, inferInputKind, buildEncoderArgs, waitForExit } from "./pipeline.js";
+import {
+  inferOutputFormat,
+  inferInputKind,
+  buildEncoderArgs,
+  resolveRenderTargets,
+  waitForExit,
+} from "./pipeline.js";
 
 describe("background-removal/pipeline — inferOutputFormat", () => {
   it("maps .webm → webm", () => {
@@ -94,6 +100,54 @@ describe("background-removal/pipeline — buildEncoderArgs", () => {
     expect(args[sIdx + 1]).toBe("640x480");
     const rIdx = args.indexOf("-r");
     expect(args[rIdx + 1]).toBe("24");
+  });
+});
+
+describe("background-removal/pipeline — resolveRenderTargets", () => {
+  it("resolves a normal video → webm render", () => {
+    const t = resolveRenderTargets("/tmp/clip.mp4", "/tmp/cutout.webm");
+    expect(t.format).toBe("webm");
+    expect(t.inputKind).toBe("video");
+    expect(t.bgFormat).toBeUndefined();
+  });
+
+  it("resolves an image → png render", () => {
+    const t = resolveRenderTargets("/tmp/portrait.jpg", "/tmp/cutout.png");
+    expect(t.format).toBe("png");
+    expect(t.inputKind).toBe("image");
+  });
+
+  it("rejects image input with a video output extension", () => {
+    expect(() => resolveRenderTargets("/tmp/portrait.jpg", "/tmp/cutout.webm")).toThrow(
+      /Image input requires a \.png output/,
+    );
+  });
+
+  it("rejects video input with a .png output", () => {
+    expect(() => resolveRenderTargets("/tmp/clip.mp4", "/tmp/cutout.png")).toThrow(
+      /Video input requires a \.webm or \.mov output/,
+    );
+  });
+
+  it("threads background-output format through when valid", () => {
+    const t = resolveRenderTargets("/tmp/clip.mp4", "/tmp/fg.webm", "/tmp/bg.webm");
+    expect(t.bgFormat).toBe("webm");
+    const tMov = resolveRenderTargets("/tmp/clip.mp4", "/tmp/fg.webm", "/tmp/bg.mov");
+    expect(tMov.bgFormat).toBe("mov");
+  });
+
+  it("rejects --background-output for image inputs (no temporal pairing to do)", () => {
+    expect(() =>
+      resolveRenderTargets("/tmp/portrait.jpg", "/tmp/cutout.png", "/tmp/bg.png"),
+    ).toThrow(/--background-output is not supported for image inputs/);
+  });
+
+  it("rejects .png as the --background-output extension", () => {
+    // .png is only valid for single-image inputs, and image inputs themselves
+    // can't have a background-output anyway. So .png here is always a misuse.
+    expect(() => resolveRenderTargets("/tmp/clip.mp4", "/tmp/fg.webm", "/tmp/bg.png")).toThrow(
+      /--background-output must be \.webm or \.mov/,
+    );
   });
 });
 

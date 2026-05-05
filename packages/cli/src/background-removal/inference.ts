@@ -24,10 +24,24 @@ interface OrtModule {
   Tensor: typeof Tensor;
 }
 
+export interface SessionResult {
+  /** Subject opaque, background fully transparent. */
+  fg: Buffer;
+  /** Inverse-alpha plate: same RGB, alpha is `255 − mask`. Null unless `withBackground` was true. */
+  bg: Buffer | null;
+}
+
 export interface Session {
-  /** Run inference on one RGB frame, return RGBA bytes (H*W*4). */
-  process(rgb: Buffer, width: number, height: number): Promise<Buffer>;
-  /** ORT EP that was actually selected. */
+  /**
+   * Both `fg` and `bg` (when requested) are session-owned buffers reused on the
+   * next call — drain the encoder's stdin before invoking `process` again.
+   */
+  process(
+    rgb: Buffer,
+    width: number,
+    height: number,
+    withBackground?: boolean,
+  ): Promise<SessionResult>;
   provider: string;
   close(): Promise<void>;
 }
@@ -73,16 +87,15 @@ export async function createSession(options: CreateSessionOptions = {}): Promise
     throw new Error("ONNX session is missing input or output bindings");
   }
 
-  // Pre-allocated per-frame buffers reused across every process() call.
-  // At 1080p this saves ~9 MB of allocations per frame. rgbaBuf is sized
-  // lazily on the first call (we don't know W/H until then).
+  // Reused across calls; sized lazily on first frame. Saves ~9 MB/frame at 1080p.
   const inputData = new Float32Array(3 * INPUT_PLANE);
   const maskBuf = Buffer.allocUnsafe(INPUT_PLANE);
   let rgbaBuf: Buffer | null = null;
+  let rgbaBgBuf: Buffer | null = null;
 
   return {
     provider: providerUsed,
-    async process(rgb, width, height) {
+    async process(rgb, width, height, withBackground = false) {
       const tensor = await preprocess(sharp, ort, rgb, width, height, inputData);
       const outputs = await session.run({ [inputName]: tensor });
       const output = outputs[outputName];
@@ -91,7 +104,21 @@ export async function createSession(options: CreateSessionOptions = {}): Promise
       if (!rgbaBuf || rgbaBuf.length !== expectedBytes) {
         rgbaBuf = Buffer.allocUnsafe(expectedBytes);
       }
-      return await postprocess(sharp, output, rgb, width, height, maskBuf, rgbaBuf);
+      if (withBackground) {
+        if (!rgbaBgBuf || rgbaBgBuf.length !== expectedBytes) {
+          rgbaBgBuf = Buffer.allocUnsafe(expectedBytes);
+        }
+      }
+      return await postprocess(
+        sharp,
+        output,
+        rgb,
+        width,
+        height,
+        maskBuf,
+        rgbaBuf,
+        withBackground ? rgbaBgBuf : null,
+      );
     },
     async close() {
       await session.release();
@@ -141,7 +168,8 @@ async function postprocess(
   height: number,
   maskBuf: Buffer,
   rgbaBuf: Buffer,
-): Promise<Buffer> {
+  rgbaBgBuf: Buffer | null,
+): Promise<SessionResult> {
   const raw = output.data as Float32Array;
 
   let lo = Infinity;
@@ -172,11 +200,30 @@ async function postprocess(
     .raw()
     .toBuffer();
 
-  for (let i = 0; i < width * height; i++) {
+  const pixels = width * height;
+  if (rgbaBgBuf) {
+    for (let i = 0; i < pixels; i++) {
+      const r = rgb[i * 3]!;
+      const g = rgb[i * 3 + 1]!;
+      const b = rgb[i * 3 + 2]!;
+      const m = fullMask[i]!;
+      const o = i * 4;
+      rgbaBuf[o] = r;
+      rgbaBuf[o + 1] = g;
+      rgbaBuf[o + 2] = b;
+      rgbaBuf[o + 3] = m;
+      rgbaBgBuf[o] = r;
+      rgbaBgBuf[o + 1] = g;
+      rgbaBgBuf[o + 2] = b;
+      rgbaBgBuf[o + 3] = 255 - m;
+    }
+    return { fg: rgbaBuf, bg: rgbaBgBuf };
+  }
+  for (let i = 0; i < pixels; i++) {
     rgbaBuf[i * 4] = rgb[i * 3]!;
     rgbaBuf[i * 4 + 1] = rgb[i * 3 + 1]!;
     rgbaBuf[i * 4 + 2] = rgb[i * 3 + 2]!;
     rgbaBuf[i * 4 + 3] = fullMask[i]!;
   }
-  return rgbaBuf;
+  return { fg: rgbaBuf, bg: null };
 }

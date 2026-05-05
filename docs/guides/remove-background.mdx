@@ -80,6 +80,71 @@ npx hyperframes remove-background subject.mp4 -o transparent.mov         # editi
 npx hyperframes remove-background portrait.jpg -o cutout.png       # still image
 ```
 
+## Layer separation: emit the cutout and the background plate together
+
+Pass `--background-output` (alias `-b`) to write a *second* transparent video alongside the cutout. Same source RGB, alpha is the *inverse* mask — opaque where the surroundings were, transparent where the subject is. The result is a clean two-layer separation in a single inference pass:
+
+```bash Terminal
+npx hyperframes remove-background subject.mp4 \
+  -o subject.webm \
+  --background-output plate.webm
+```
+
+| Output | Alpha | Use it as |
+| ------ | ----- | --------- |
+| `subject.webm` | Mask — subject opaque | Foreground layer (top of stack) |
+| `plate.webm` | `255 − mask` — subject region transparent | Background layer; place anything you want **under the subject's silhouette** between this and `subject.webm` |
+
+Both encoders share the source W/H/fps and your `--quality` preset, so the layers are pixel-aligned. Encode cost roughly doubles; segmentation cost is unchanged.
+
+<Tip>
+**This is a hole-cut plate, not an inpainted clean plate.** The subject region in `plate.webm` is fully transparent — you have to composite something opaque under it (a graphic, a blurred copy, a different scene) to fill the hole. If you need an actual filled background where the subject was, use a video inpainter (LaMa, ProPainter, RunwayML Inpaint) — `remove-background` is not the right tool for that.
+</Tip>
+
+### Hole-cut vs. clean plate — when does the difference matter?
+
+A **hole-cut plate** keeps the original surroundings and makes the subject region transparent. A **clean plate** fills the subject region with reconstructed background — produced by a separate inpainting model. Display each alone over black:
+
+| | Hole-cut plate (this command) | Clean plate (inpainted) |
+| --- | --- | --- |
+| Subject region | Transparent silhouette | Reconstructed background pixels |
+| What you see alone | A person-shaped hole | An empty room |
+| Cost | One inference pass, one extra ffmpeg encode | A second model (LaMa, ProPainter, E2FGVI) |
+| Tool | `remove-background --background-output` | Outside this CLI |
+
+The line is: **does anything ever need to be visible *through* the subject's silhouette where the subject used to be?**
+
+| Use case | What you need |
+| --- | --- |
+| Text/graphics live *between* the cutout and the plate (the example above) | **Hole-cut** — the graphics fill the hole. |
+| Composite the subject onto an unrelated scene | Neither. Just use `subject.webm`; the plate is irrelevant. |
+| Show "the room without the person" as a real background | **Clean plate** — a hole-cut plate would show a transparent void. |
+| Replace the person with a different subject (re-target) | **Clean plate** — the new subject needs real pixels under it. |
+| VFX rotoscoping / "remove an extra from this take" | **Clean plate** — the canonical inpainting use case. |
+
+If something opaque always covers the silhouette, hole-cut is sufficient and ~1000× cheaper than running an inpainter.
+
+### The two-layer composition pattern
+
+The two-layer pattern is functionally a drop-in for [text-behind-subject](#text-behind-subject-the-recommended-layout) without needing the original `presenter.mp4` in the project — the plate replaces it as the bottom layer:
+
+```html
+<!-- z=1 inverse-alpha plate fills everything except the subject's silhouette -->
+<video src="plate.webm" data-start="0" data-duration="6" data-track-index="0" muted playsinline></video>
+
+<!-- z=2 anything you want occluded by the subject lives here -->
+<h1 style="z-index:2; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);">
+  MAKE IT IN HYPERFRAMES
+</h1>
+
+<!-- z=3 the cutout puts the subject back on top -->
+<div class="cutout-wrap" style="position:absolute;inset:0;z-index:3">
+  <video src="subject.webm" data-start="0" data-duration="6" data-track-index="1" muted playsinline></video>
+</div>
+```
+
+Constraints: the flag requires a video input and `.webm` or `.mov` for both outputs. It's not valid for image inputs (no temporal pairing to do) and won't accept `.png` for the plate.
+
 ## Performance
 
 Real-world numbers from the [matting eval](https://www.heygenverse.com/a/0dd5a431-1832-4858-862d-de7fb7d02654), running u²-net_human_seg on a 4-second 1080p clip:

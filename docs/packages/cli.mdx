@@ -356,6 +356,10 @@ This is suppressed in CI environments, non-TTY shells, and when `HYPERFRAMES_NO_
     # Single image → transparent PNG
     npx hyperframes remove-background portrait.jpg -o cutout.png
 
+    # Layer separation: cutout AND inverse-alpha background plate in one pass
+    npx hyperframes remove-background avatar.mp4 \
+      -o subject.webm --background-output plate.webm
+
     # Force CPU on a machine that has CoreML or CUDA
     npx hyperframes remove-background avatar.mp4 -o transparent.webm --device cpu
 
@@ -366,8 +370,9 @@ This is suppressed in CI environments, non-TTY shells, and when `HYPERFRAMES_NO_
     | Flag | Description |
     |------|-------------|
     | `--output, -o` | Output path. Format inferred from extension: `.webm` (default), `.mov`, `.png` |
+    | `--background-output, -b` | Optional second output: inverse-alpha background plate (subject region transparent, surroundings opaque). Same source RGB, complementary mask. Must be `.webm` or `.mov`. Hole-cut, not inpainted — composite something underneath to fill the hole. |
     | `--device` | Execution provider: `auto` (default), `cpu`, `coreml`, `cuda` |
-    | `--quality` | WebM encoder preset: `fast` (crf 30, smallest), `balanced` (crf 18, default), `best` (crf 12, near-lossless). Higher quality keeps the cutout's RGB closer to the source mp4 — important when overlaying the cutout on its own source for text-behind-subject effects. Ignored for `.mov` / `.png`. |
+    | `--quality` | WebM encoder preset: `fast` (crf 30, smallest), `balanced` (crf 18, default), `best` (crf 12, near-lossless). Higher quality keeps the cutout's RGB closer to the source mp4 — important when overlaying the cutout on its own source for text-behind-subject effects. Applies to both `--output` and `--background-output`. Ignored for `.mov` / `.png`. |
     | `--info` | Print detected execution providers and exit (no render) |
     | `--json` | Output result as JSON |
 
