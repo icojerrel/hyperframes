@@ -12,8 +12,13 @@
     />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body {
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
         margin: 0;
         width: 1920px;
         height: 1080px;
@@ -31,7 +36,7 @@
 
       /* Subtle radial glow in center-bottom */
       #captions-slam::before {
-        content: '';
+        content: "";
         position: absolute;
         bottom: -100px;
         left: 50%;
@@ -48,13 +53,15 @@
         left: 0;
         right: 0;
         text-align: center;
-        font-family: 'Inter', system-ui, sans-serif;
+        font-family: "Inter", system-ui, sans-serif;
         font-weight: 900;
         font-size: 96px;
         line-height: 1.1;
         text-transform: uppercase;
         color: #ffffff;
-        text-shadow: 0 0 40px rgba(255, 255, 255, 0.15), 0 0 80px rgba(255, 255, 255, 0.05);
+        text-shadow:
+          0 0 40px rgba(255, 255, 255, 0.15),
+          0 0 80px rgba(255, 255, 255, 0.05);
         letter-spacing: 2px;
         opacity: 0;
         visibility: hidden;
@@ -66,7 +73,9 @@
         color: #00d4ff;
         display: inline-block;
         transform: scale(1.3);
-        text-shadow: 0 0 30px rgba(0, 212, 255, 0.4), 0 0 60px rgba(0, 212, 255, 0.15);
+        text-shadow:
+          0 0 30px rgba(0, 212, 255, 0.4),
+          0 0 60px rgba(0, 212, 255, 0.15);
       }
 
       .caption-group .word-gradient {
@@ -102,60 +111,64 @@
     </div>
 
     <script>
-    (function () {
-      var GROUPS = [
-        { text: "Write HTML", start: 0.3, end: 1.8 },
-        { text: "render video", start: 2.0, end: 3.5 },
-        { text: "No timeline editors", start: 3.8, end: 5.5 },
-        { text: "no After Effects", start: 5.7, end: 7.2 },
-        { text: "Ship 10x faster", start: 7.5, end: 9.5 },
-        { text: "with HyperFrames", start: 9.8, end: 12.0 }
-      ];
+      (function () {
+        var GROUPS = [
+          { text: "Write HTML", start: 0.3, end: 1.8 },
+          { text: "render video", start: 2.0, end: 3.5 },
+          { text: "No timeline editors", start: 3.8, end: 5.5 },
+          { text: "no After Effects", start: 5.7, end: 7.2 },
+          { text: "Ship 10x faster", start: 7.5, end: 9.5 },
+          { text: "with HyperFrames", start: 9.8, end: 12.0 },
+        ];
 
-      var root = document.getElementById("captions-slam");
+        var root = document.getElementById("captions-slam");
 
-      // Build caption group elements
-      GROUPS.forEach(function (group, gi) {
-        var div = document.createElement("div");
-        div.className = "caption-group";
-        div.id = "cg-" + gi;
+        // Build caption group elements
+        GROUPS.forEach(function (group, gi) {
+          var div = document.createElement("div");
+          div.className = "caption-group";
+          div.id = "cg-" + gi;
 
-        // Apply per-word styling
-        var words = group.text.split(" ");
-        var html = words.map(function (word) {
-          if (word === "10x") {
-            return '<span class="word-accent">' + word + '</span>';
-          }
-          if (word === "HyperFrames") {
-            return '<span class="word-gradient">' + word + '</span>';
-          }
-          return word;
-        }).join(" ");
+          // Apply per-word styling
+          var words = group.text.split(" ");
+          var html = words
+            .map(function (word) {
+              if (word === "10x") {
+                return '<span class="word-accent">' + word + "</span>";
+              }
+              if (word === "HyperFrames") {
+                return '<span class="word-gradient">' + word + "</span>";
+              }
+              return word;
+            })
+            .join(" ");
 
-        div.innerHTML = html;
-        root.appendChild(div);
-      });
+          div.innerHTML = html;
+          root.appendChild(div);
+        });
 
-      // Build timeline
-      var tl = gsap.timeline({ paused: true });
+        // Build timeline
+        var tl = gsap.timeline({ paused: true });
 
-      GROUPS.forEach(function (group, gi) {
-        var el = "#cg-" + gi;
-        tl.fromTo(el,
-          { scale: 0, opacity: 0, visibility: "visible" },
-          { scale: 1, opacity: 1, duration: 0.15, ease: "back.out(1.7)" },
-          group.start
-        );
-        tl.to(el,
-          { scale: 1.05, opacity: 0, duration: 0.12, ease: "power2.in" },
-          group.end - 0.12
-        );
-        tl.set(el, { opacity: 0, visibility: "hidden" }, group.end);
-      });
+        GROUPS.forEach(function (group, gi) {
+          var el = "#cg-" + gi;
+          tl.fromTo(
+            el,
+            { scale: 0, opacity: 0, visibility: "visible" },
+            { scale: 1, opacity: 1, duration: 0.15, ease: "back.out(1.7)" },
+            group.start,
+          );
+          tl.to(
+            el,
+            { scale: 1.05, opacity: 0, duration: 0.12, ease: "power2.in" },
+            group.end - 0.12,
+          );
+          tl.set(el, { opacity: 0, visibility: "hidden" }, group.end);
+        });
 
-      window.__timelines = window.__timelines || [];
-      window.__timelines.push(tl);
-    })();
+        window.__timelines = window.__timelines || [];
+        window.__timelines.push(tl);
+      })();
     </script>
   </body>
 </html>
