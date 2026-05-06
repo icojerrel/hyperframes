@@ -200,30 +200,50 @@ async function postprocess(
     .raw()
     .toBuffer();
 
-  const pixels = width * height;
-  if (rgbaBgBuf) {
+  return applyMask(rgb, fullMask, rgbaBuf, rgbaBgBuf, width * height);
+}
+
+/**
+ * Composite the RGB source frame with the segmentation mask into one or two
+ * RGBA buffers. The contract this PR is built on:
+ *  - `fg`'s alpha is the mask, `bg`'s alpha (when provided) is `255 − mask`,
+ *    so `fg.alpha + bg.alpha === 255` for every pixel.
+ *  - RGB triples are byte-identical between `fg` and `bg`.
+ *  - When `bg` is null, only `fg` is touched.
+ *
+ * Exported for direct unit testing of the invariants above without spinning
+ * up an ONNX session.
+ */
+export function applyMask(
+  rgb: Buffer,
+  mask: Buffer,
+  fg: Buffer,
+  bg: Buffer | null,
+  pixels: number,
+): SessionResult {
+  if (bg) {
     for (let i = 0; i < pixels; i++) {
       const r = rgb[i * 3]!;
       const g = rgb[i * 3 + 1]!;
       const b = rgb[i * 3 + 2]!;
-      const m = fullMask[i]!;
+      const m = mask[i]!;
       const o = i * 4;
-      rgbaBuf[o] = r;
-      rgbaBuf[o + 1] = g;
-      rgbaBuf[o + 2] = b;
-      rgbaBuf[o + 3] = m;
-      rgbaBgBuf[o] = r;
-      rgbaBgBuf[o + 1] = g;
-      rgbaBgBuf[o + 2] = b;
-      rgbaBgBuf[o + 3] = 255 - m;
+      fg[o] = r;
+      fg[o + 1] = g;
+      fg[o + 2] = b;
+      fg[o + 3] = m;
+      bg[o] = r;
+      bg[o + 1] = g;
+      bg[o + 2] = b;
+      bg[o + 3] = 255 - m;
     }
-    return { fg: rgbaBuf, bg: rgbaBgBuf };
+    return { fg, bg };
   }
   for (let i = 0; i < pixels; i++) {
-    rgbaBuf[i * 4] = rgb[i * 3]!;
-    rgbaBuf[i * 4 + 1] = rgb[i * 3 + 1]!;
-    rgbaBuf[i * 4 + 2] = rgb[i * 3 + 2]!;
-    rgbaBuf[i * 4 + 3] = fullMask[i]!;
+    fg[i * 4] = rgb[i * 3]!;
+    fg[i * 4 + 1] = rgb[i * 3 + 1]!;
+    fg[i * 4 + 2] = rgb[i * 3 + 2]!;
+    fg[i * 4 + 3] = mask[i]!;
   }
-  return { fg: rgbaBuf, bg: null };
+  return { fg, bg: null };
 }

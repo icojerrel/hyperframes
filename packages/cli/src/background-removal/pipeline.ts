@@ -318,12 +318,21 @@ interface FfmpegProc {
   getStderr: () => string;
 }
 
-function spawnFfmpeg(args: string[], label: string, stdio: ("ignore" | "pipe")[]): FfmpegProc {
+type StdioFd = "ignore" | "pipe";
+type StdioTuple = [StdioFd, StdioFd, StdioFd];
+
+function spawnFfmpeg(args: string[], label: string, stdio: StdioTuple): FfmpegProc {
   const proc = spawn("ffmpeg", args, { stdio });
   let stderrBuf = "";
   proc.stderr?.on("data", (d: Buffer) => {
     stderrBuf += d.toString();
   });
+  // If the encoder dies mid-render, the next .write() to its stdin emits an
+  // 'error' event on the writable. Without a listener, Node treats it as
+  // unhandled and crashes the CLI before waitForExit's reject path can
+  // surface the real cause (encoder stderr tail). Swallowing here is safe —
+  // the process exit is the source of truth.
+  proc.stdin?.on("error", () => {});
   const exit = waitForExit(proc, label, () => stderrBuf);
   return { proc, exit, getStderr: () => stderrBuf };
 }
@@ -383,6 +392,13 @@ async function runPipeline(
       // Issue both writes before any await so a slow encoder doesn't block
       // the other. Drain anything that returned false before the next
       // session.process() — its output buffers are reused per frame.
+      //
+      // Subtlety: write() returning true means "highWaterMark not exceeded,"
+      // NOT "libuv has flushed the chunk." The buffer reference is held by
+      // libuv until the underlying syscall completes. Reusing the session's
+      // output buffer is safe because the next session.process() call takes
+      // ~10–50ms (ORT inference) — plenty of event-loop turns for libuv to
+      // drain. If that ever stops being true, we'd need to copy here.
       const fgWroteFully = fg.proc.stdin!.write(result.fg);
       const bgWroteFully = bg && result.bg ? bg.proc.stdin!.write(result.bg) : true;
       if (!fgWroteFully || !bgWroteFully) {
