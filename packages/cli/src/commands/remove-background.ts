@@ -21,6 +21,10 @@ export const examples: Example[] = [
     "hyperframes remove-background portrait.jpg -o cutout.png",
   ],
   [
+    "Separate the layers — emit both the cutout and an inverse-alpha background plate (subject region transparent)",
+    "hyperframes remove-background avatar.mp4 -o subject.webm --background-output plate.webm",
+  ],
+  [
     "Force CPU (skip CoreML/CUDA)",
     "hyperframes remove-background avatar.mp4 -o transparent.webm --device cpu",
   ],
@@ -51,6 +55,12 @@ export default defineCommand({
       type: "string",
       description: "Output path. Format inferred from extension: .webm (default), .mov, .png",
       alias: "o",
+    },
+    "background-output": {
+      type: "string",
+      description:
+        "Optional second output path for the inverse-alpha background plate (subject region transparent, original surroundings opaque). Hole-cut, not inpainted — composite something underneath to fill the hole. Must be .webm or .mov; not allowed for image inputs.",
+      alias: "b",
     },
     device: {
       type: "string",
@@ -104,6 +114,8 @@ export default defineCommand({
 
     const inputPath = resolve(args.input);
     const outputPath = resolve(args.output);
+    const backgroundOutputArg = args["background-output"];
+    const backgroundOutputPath = backgroundOutputArg ? resolve(backgroundOutputArg) : undefined;
 
     const { render } = await import("../background-removal/pipeline.js");
 
@@ -114,6 +126,7 @@ export default defineCommand({
       const result = await render({
         inputPath,
         outputPath,
+        backgroundOutputPath,
         device: args.device,
         quality: args.quality,
         onProgress: (event) => {
@@ -137,6 +150,9 @@ export default defineCommand({
           JSON.stringify({
             ok: true,
             outputPath: result.outputPath,
+            ...(result.backgroundOutputPath
+              ? { backgroundOutputPath: result.backgroundOutputPath }
+              : {}),
             framesProcessed: result.framesProcessed,
             durationSeconds: Number(result.durationSeconds.toFixed(2)),
             avgMsPerFrame: Number(result.avgMsPerFrame.toFixed(1)),
@@ -148,9 +164,12 @@ export default defineCommand({
         const fpsThroughput = result.durationSeconds
           ? (result.framesProcessed / result.durationSeconds).toFixed(1)
           : "n/a";
+        const outputs = result.backgroundOutputPath
+          ? `${c.accent(result.outputPath)} + ${c.accent(result.backgroundOutputPath)}`
+          : c.accent(result.outputPath);
         spin?.stop(
           c.success(
-            `Removed background from ${c.accent(String(result.framesProcessed))} frames in ${result.durationSeconds.toFixed(1)}s (${fpsThroughput} fps, ${c.accent(result.provider)}) → ${c.accent(result.outputPath)}`,
+            `Removed background from ${c.accent(String(result.framesProcessed))} frames in ${result.durationSeconds.toFixed(1)}s (${fpsThroughput} fps, ${c.accent(result.provider)}) → ${outputs}`,
           ),
         );
       }

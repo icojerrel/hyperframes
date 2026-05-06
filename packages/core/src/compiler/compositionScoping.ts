@@ -212,7 +212,11 @@ export function wrapScopedCompositionScript(
         value: __hfFindRoot(),
         configurable: true,
       });
-    } catch (_err) {}
+    } catch {
+      // Best-effort: timelines coming from user code may have a frozen target
+      // or a non-extensible defineProperty path. Swallow — the scoped root
+      // is an enrichment, not a correctness invariant for playback.
+    }
     return timeline;
   };
   var __hfBaseGsap = typeof gsap === "undefined" ? window.gsap : gsap;
@@ -282,5 +286,5 @@ ${source}
   };
   __hfFindRoot();
   __hfRun();
-})()`;
+})();`;
 }
