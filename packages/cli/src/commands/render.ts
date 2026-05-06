@@ -401,7 +401,7 @@ export default defineCommand({
         format,
         workers,
         gpu: useGpu,
-        browserGpu: browserGpuMode === "hardware",
+        browserGpuMode,
         hdrMode: args.sdr ? "force-sdr" : args.hdr ? "force-hdr" : "auto",
         crf,
         videoBitrate,
@@ -436,14 +436,11 @@ interface RenderOptions {
   workers?: number;
   gpu: boolean;
   /**
-   * For local renders: tri-state ("auto" | "hardware" | "software"). "auto"
-   * probes WebGL availability on first launch and falls back to software.
-   * Docker renders use the boolean `browserGpu` field instead because the
-   * docker run-args wire the inner CLI's `--no-browser-gpu` flag.
+   * Chrome WebGL backend mode. "auto" probes on first launch and falls back
+   * to "software" if no usable GPU. Defaults to "software" when omitted to
+   * stay backwards-compatible with callers that pre-date the tri-state.
    */
   browserGpuMode?: "auto" | "hardware" | "software";
-  /** Docker-only: true → host GPU passthrough, false → forced software. */
-  browserGpu?: boolean;
   hdrMode: "auto" | "force-hdr" | "force-sdr";
   crf?: number;
   videoBitrate?: string;
@@ -737,7 +734,7 @@ async function renderDocker(
       format: options.format,
       workers: options.workers,
       gpu: options.gpu,
-      browserGpu: options.browserGpu ?? false,
+      browserGpu: options.browserGpuMode === "hardware",
       hdrMode: options.hdrMode,
       crf: options.crf,
       videoBitrate: options.videoBitrate,
@@ -807,7 +804,7 @@ export async function renderLocal(
     workers: options.workers,
     useGpu: options.gpu,
     producerConfig: producer.resolveConfig({
-      browserGpuMode: options.browserGpuMode ?? (options.browserGpu ? "hardware" : "software"),
+      browserGpuMode: options.browserGpuMode ?? "software",
     }),
     hdrMode: options.hdrMode,
     crf: options.crf,
