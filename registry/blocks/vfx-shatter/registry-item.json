@@ -10,10 +10,7 @@
     "height": 1080
   },
   "duration": 12,
-  "tags": [
-    "html-in-canvas",
-    "webgl"
-  ],
+  "tags": ["html-in-canvas", "webgl"],
   "files": [
     {
       "path": "vfx-shatter.html",

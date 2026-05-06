@@ -10,10 +10,7 @@
     "height": 1080
   },
   "duration": 13,
-  "tags": [
-    "captions",
-    "minimal"
-  ],
+  "tags": ["captions", "minimal"],
   "files": [
     {
       "path": "captions-minimal.html",

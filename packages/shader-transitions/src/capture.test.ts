@@ -12,11 +12,11 @@ describe("isHtmlInCanvasCaptureSupported", () => {
     expect(isHtmlInCanvasCaptureSupported()).toBe(false);
   });
 
-  it("requires layoutsubtree, requestPaint, and drawElementImage", () => {
+  it("returns true when layoutSubtree and drawElementImage are available", () => {
     vi.stubGlobal("document", {
       createElement: () => ({
-        layoutSubtree: false,
-        requestPaint: () => undefined,
+        setAttribute: () => undefined,
+        layoutSubtree: true,
         getContext: () => ({
           drawElementImage: () => undefined,
         }),
@@ -29,8 +29,8 @@ describe("isHtmlInCanvasCaptureSupported", () => {
   it("returns false when drawElementImage is missing", () => {
     vi.stubGlobal("document", {
       createElement: () => ({
-        layoutSubtree: false,
-        requestPaint: () => undefined,
+        setAttribute: () => undefined,
+        layoutSubtree: true,
         getContext: () => ({}),
       }),
     });

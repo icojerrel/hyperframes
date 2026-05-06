@@ -101,14 +101,6 @@ interface CanvasRenderingContext2DWithDrawElement extends CanvasRenderingContext
   drawElementImage: (element: Element, x: number, y: number, w: number, h: number) => void;
 }
 
-function hasLayoutSubtreeCanvas(canvas: HTMLCanvasElement): canvas is CanvasWithLayoutSubtree {
-  const candidate = canvas as HTMLCanvasElement & {
-    layoutSubtree?: unknown;
-    requestPaint?: unknown;
-  };
-  return "layoutSubtree" in candidate && typeof candidate.requestPaint === "function";
-}
-
 export function isHtmlInCanvasCaptureSupported(): boolean {
   if (typeof document === "undefined") return false;
   const probe = document.createElement("canvas") as HTMLCanvasElement & {

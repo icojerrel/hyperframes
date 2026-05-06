@@ -10,10 +10,7 @@
     "height": 1080
   },
   "duration": 15,
-  "tags": [
-    "html-in-canvas",
-    "webgl"
-  ],
+  "tags": ["html-in-canvas", "webgl"],
   "files": [
     {
       "path": "vfx-magnetic.html",

@@ -10,13 +10,7 @@
     "height": 1080
   },
   "duration": 12,
-  "tags": [
-    "html-in-canvas",
-    "liquid",
-    "webgl",
-    "displacement",
-    "background"
-  ],
+  "tags": ["html-in-canvas", "liquid", "webgl", "displacement", "background"],
   "files": [
     {
       "path": "vfx-liquid-background.html",

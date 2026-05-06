@@ -10,10 +10,7 @@
     "height": 1080
   },
   "duration": 10,
-  "tags": [
-    "html-in-canvas",
-    "webgl"
-  ],
+  "tags": ["html-in-canvas", "webgl"],
   "files": [
     {
       "path": "vfx-portal.html",

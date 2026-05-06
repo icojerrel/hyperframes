@@ -10,14 +10,7 @@
     "height": 1080
   },
   "duration": 15,
-  "tags": [
-    "html-in-canvas",
-    "3d",
-    "device",
-    "iphone",
-    "macbook",
-    "gltf"
-  ],
+  "tags": ["html-in-canvas", "3d", "device", "iphone", "macbook", "gltf"],
   "files": [
     {
       "path": "vfx-iphone-device.html",

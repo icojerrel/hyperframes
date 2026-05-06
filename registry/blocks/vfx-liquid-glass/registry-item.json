@@ -10,10 +10,7 @@
     "height": 1080
   },
   "duration": 20,
-  "tags": [
-    "html-in-canvas",
-    "webgl"
-  ],
+  "tags": ["html-in-canvas", "webgl"],
   "files": [
     {
       "path": "vfx-liquid-glass.html",

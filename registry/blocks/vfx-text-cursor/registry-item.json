@@ -10,13 +10,7 @@
     "height": 1080
   },
   "duration": 8,
-  "tags": [
-    "html-in-canvas",
-    "text",
-    "shader",
-    "cursor",
-    "chromatic"
-  ],
+  "tags": ["html-in-canvas", "text", "shader", "cursor", "chromatic"],
   "files": [
     {
       "path": "vfx-text-cursor.html",
