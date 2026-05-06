@@ -1,9 +1,9 @@
 ---
 title: Deploy
-description: "Run a Hyperframes preview + render API on Vercel or Cloudflare with one click."
+description: "Run a Hyperframes preview + render API in the cloud from a one-click template."
 ---
 
-Hyperframes ships two official deployment templates that wrap a composition in a small web app: an in-browser preview and a `/api/render` endpoint that produces an MP4 server-side. Both are open source, Apache-2.0, and deploy in one click.
+Hyperframes ships two official deployment templates that wrap a composition in a small web app: an in-browser preview and a `/api/render` endpoint that produces an MP4 server-side. Both are open source, Apache-2.0, and deploy from a single button.
 
 | Template | Compute | Storage | Deploy |
 |----------|---------|---------|--------|
@@ -55,7 +55,7 @@ Both templates use the same shape:
 
     **Performance**
 
-    Cold render of a 13-second composition is ~25 seconds on `standard-4` (4 vCPU, 12 GiB). With `--workers auto`, three parallel Chrome workers cut render time roughly 2× vs. single-worker. Container instances sleep after 10 minutes of inactivity.
+    With `--workers auto` on `standard-4` (4 vCPU, 12 GiB), three parallel Chrome workers cut render time roughly 2× vs. single-worker. The bundled 13-second composition renders in ~25 seconds when tested locally against the container image on a 6-vCPU host (`scripts/test-render.mjs`); production timings on `standard-4` will vary with composition length and complexity. Container instances sleep after 10 minutes of inactivity.
 
     **Pricing**
 
