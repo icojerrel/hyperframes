@@ -222,6 +222,54 @@
     {
       "name": "transitions-scale",
       "type": "hyperframes:block"
+    },
+    {
+      "name": "captions-slam",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "captions-karaoke",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "captions-minimal",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "captions-bounce",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "captions-cinematic",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "vfx-text-cursor",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "vfx-liquid-background",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "vfx-iphone-device",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "vfx-magnetic",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "vfx-portal",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "vfx-liquid-glass",
+      "type": "hyperframes:block"
+    },
+    {
+      "name": "vfx-shatter",
+      "type": "hyperframes:block"
     }
   ]
 }

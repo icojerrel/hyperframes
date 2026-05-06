@@ -1,0 +1,14 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "captions-slam",
+  "type": "hyperframes:block",
+  "title": "Captions – Slam",
+  "description": "Bold, punchy slam captions with back-eased overshoot scale-in, uppercase Inter 900, and per-word accent styling",
+  "stability": "stable",
+  "dimensions": { "width": 1920, "height": 1080 },
+  "duration": 13,
+  "tags": ["captions", "slam"],
+  "files": [
+    { "path": "captions-slam.html", "target": "compositions/captions-slam.html", "type": "hyperframes:composition" }
+  ]
+}

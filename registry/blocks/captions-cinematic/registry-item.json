@@ -1,0 +1,14 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "captions-cinematic",
+  "type": "hyperframes:block",
+  "title": "Captions – Cinematic",
+  "description": "Elegant film-title captions with slow fade, letter-spacing animation, warm tint, and extending horizontal accent line",
+  "stability": "stable",
+  "dimensions": { "width": 1920, "height": 1080 },
+  "duration": 13,
+  "tags": ["captions", "cinematic"],
+  "files": [
+    { "path": "captions-cinematic.html", "target": "compositions/captions-cinematic.html", "type": "hyperframes:composition" }
+  ]
+}
