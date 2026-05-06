@@ -1,6 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildChromeArgs, forceReleaseBrowser } from "./browserManager.js";
+import {
+  _resetAutoBrowserGpuModeCacheForTests,
+  buildChromeArgs,
+  forceReleaseBrowser,
+  resolveBrowserGpuMode,
+} from "./browserManager.js";
 
 describe("buildChromeArgs browser GPU mode", () => {
   const base = { width: 1920, height: 1080 };
@@ -10,6 +15,7 @@ describe("buildChromeArgs browser GPU mode", () => {
     expect(args).toContain("--enable-features=CanvasDrawElement");
     expect(args).toContain("--use-gl=angle");
     expect(args).toContain("--use-angle=swiftshader");
+    expect(args).toContain("--enable-unsafe-swiftshader");
     expect(args).not.toContain("--enable-gpu-rasterization");
   });
 
@@ -45,6 +51,57 @@ describe("buildChromeArgs browser GPU mode", () => {
     expect(args).toContain("--disable-gpu");
     expect(args).toContain("--use-angle=swiftshader");
     expect(args).not.toContain("--use-angle=metal");
+  });
+});
+
+describe("resolveBrowserGpuMode", () => {
+  beforeEach(() => {
+    _resetAutoBrowserGpuModeCacheForTests();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    _resetAutoBrowserGpuModeCacheForTests();
+  });
+
+  it("passes 'software' through unchanged without probing", async () => {
+    const mode = await resolveBrowserGpuMode("software");
+    expect(mode).toBe("software");
+  });
+
+  it("passes 'hardware' through unchanged without probing", async () => {
+    const mode = await resolveBrowserGpuMode("hardware");
+    expect(mode).toBe("hardware");
+  });
+
+  it("falls back to 'software' when the probe browser cannot launch", async () => {
+    // No chromePath, env unset, and (in the test env) no system Chrome to find
+    // → puppeteer.launch will throw → caller catches → software fallback.
+    // Force a definitely-missing chrome binary so the launch path errors fast.
+    const mode = await resolveBrowserGpuMode("auto", {
+      chromePath: "/definitely/not/a/real/chrome/binary",
+      browserTimeout: 2000,
+    });
+    expect(mode).toBe("software");
+  });
+
+  it("caches the probe result across calls", async () => {
+    const first = await resolveBrowserGpuMode("auto", {
+      chromePath: "/definitely/not/a/real/chrome/binary",
+      browserTimeout: 2000,
+    });
+    // Second call uses cache — no new launch. Assert the same answer comes back
+    // even with a different chromePath that would have a different probe outcome.
+    const second = await resolveBrowserGpuMode("auto", {
+      chromePath: "/another/definitely/missing/path",
+      browserTimeout: 2000,
+    });
+    expect(first).toBe("software");
+    expect(second).toBe("software");
+    // Reset and re-probe to confirm the test-only reset works.
+    _resetAutoBrowserGpuModeCacheForTests();
+    const third = await resolveBrowserGpuMode("hardware");
+    expect(third).toBe("hardware");
   });
 });
 

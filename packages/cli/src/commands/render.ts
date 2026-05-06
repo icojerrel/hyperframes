@@ -118,7 +118,7 @@ export default defineCommand({
     "browser-gpu": {
       type: "boolean",
       description:
-        "Use host GPU acceleration for Chrome/WebGL capture. Enabled by default for local renders; use --no-browser-gpu to opt out.",
+        "Force host GPU acceleration for Chrome/WebGL capture. Default: auto (probe on first launch; fall back to software if no GPU). Use --no-browser-gpu to force software (SwiftShader).",
     },
     quiet: {
       type: "boolean",
@@ -224,7 +224,7 @@ export default defineCommand({
     const useDocker = args.docker ?? false;
     const useGpu = args.gpu ?? false;
     const browserGpuArg = args["browser-gpu"];
-    const useBrowserGpu = resolveBrowserGpuForCli(useDocker, browserGpuArg);
+    const browserGpuMode = resolveBrowserGpuForCli(useDocker, browserGpuArg);
     const quiet = args.quiet ?? false;
     const strictAll = args["strict-all"] ?? false;
     const strictErrors = (args.strict ?? false) || strictAll;
@@ -275,10 +275,14 @@ export default defineCommand({
           c.dim(" \u2192 " + outputPath),
       );
       console.log(c.dim("   " + fps + "fps \u00B7 " + quality + " \u00B7 " + workerLabel));
-      if (useGpu || useBrowserGpu) {
+      if (useGpu || browserGpuMode !== "software") {
         const gpuModes = [
           useGpu ? "encoder GPU" : null,
-          useBrowserGpu ? "browser GPU (auto)" : null,
+          browserGpuMode === "hardware"
+            ? "browser GPU (forced)"
+            : browserGpuMode === "auto"
+              ? "browser GPU (auto-detect)"
+              : null,
         ].filter(Boolean);
         console.log(c.dim("   GPU: " + gpuModes.join(" + ")));
       }
@@ -397,7 +401,7 @@ export default defineCommand({
         format,
         workers,
         gpu: useGpu,
-        browserGpu: useBrowserGpu,
+        browserGpu: browserGpuMode === "hardware",
         hdrMode: args.sdr ? "force-sdr" : args.hdr ? "force-hdr" : "auto",
         crf,
         videoBitrate,
@@ -412,7 +416,7 @@ export default defineCommand({
         format,
         workers,
         gpu: useGpu,
-        browserGpu: useBrowserGpu,
+        browserGpuMode,
         hdrMode: args.sdr ? "force-sdr" : args.hdr ? "force-hdr" : "auto",
         crf,
         videoBitrate,
@@ -431,7 +435,15 @@ interface RenderOptions {
   format: "mp4" | "webm" | "mov";
   workers?: number;
   gpu: boolean;
-  browserGpu: boolean;
+  /**
+   * For local renders: tri-state ("auto" | "hardware" | "software"). "auto"
+   * probes WebGL availability on first launch and falls back to software.
+   * Docker renders use the boolean `browserGpu` field instead because the
+   * docker run-args wire the inner CLI's `--no-browser-gpu` flag.
+   */
+  browserGpuMode?: "auto" | "hardware" | "software";
+  /** Docker-only: true → host GPU passthrough, false → forced software. */
+  browserGpu?: boolean;
   hdrMode: "auto" | "force-hdr" | "force-sdr";
   crf?: number;
   videoBitrate?: string;
@@ -579,15 +591,33 @@ export function validateVariablesAgainstProject(
   return validateVariables(values, meta.variables);
 }
 
+/**
+ * Resolve the browser-GPU mode for a CLI render invocation.
+ *
+ * Priority (highest first):
+ *   1. Docker mode → always "software" (docker has no portable GPU
+ *      passthrough; the engine's render path uses SwiftShader).
+ *   2. Explicit CLI flag — `--browser-gpu` → "hardware",
+ *      `--no-browser-gpu` → "software".
+ *   3. Env var `PRODUCER_BROWSER_GPU_MODE` accepts "hardware" / "software" /
+ *      "auto".
+ *   4. Default = "auto" — engine probes WebGL availability on first launch
+ *      and falls back to software if the host lacks a usable GPU.
+ *
+ * Returning "auto" by default lets local renders Just Work whether or not the
+ * host has a GPU, while preserving the explicit overrides for CI / power
+ * users who want failure-on-misconfig.
+ */
 export function resolveBrowserGpuForCli(
   useDocker: boolean,
   browserGpuArg: boolean | undefined,
   envMode = process.env.PRODUCER_BROWSER_GPU_MODE,
-): boolean {
-  if (useDocker) return false;
-  if (browserGpuArg !== undefined) return browserGpuArg;
-  if (envMode === "software") return false;
-  return true;
+): "auto" | "hardware" | "software" {
+  if (useDocker) return "software";
+  if (browserGpuArg === true) return "hardware";
+  if (browserGpuArg === false) return "software";
+  if (envMode === "hardware" || envMode === "software" || envMode === "auto") return envMode;
+  return "auto";
 }
 
 const DOCKER_IMAGE_PREFIX = "hyperframes-renderer";
@@ -707,7 +737,7 @@ async function renderDocker(
       format: options.format,
       workers: options.workers,
       gpu: options.gpu,
-      browserGpu: options.browserGpu,
+      browserGpu: options.browserGpu ?? false,
       hdrMode: options.hdrMode,
       crf: options.crf,
       videoBitrate: options.videoBitrate,
@@ -777,7 +807,7 @@ export async function renderLocal(
     workers: options.workers,
     useGpu: options.gpu,
     producerConfig: producer.resolveConfig({
-      browserGpuMode: options.browserGpu ? "hardware" : "software",
+      browserGpuMode: options.browserGpuMode ?? (options.browserGpu ? "hardware" : "software"),
     }),
     hdrMode: options.hdrMode,
     crf: options.crf,

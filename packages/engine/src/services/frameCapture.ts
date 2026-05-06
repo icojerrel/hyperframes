@@ -18,6 +18,7 @@ import {
   releaseBrowser,
   forceReleaseBrowser,
   buildChromeArgs,
+  resolveBrowserGpuMode,
   resolveHeadlessShellPath,
   type CaptureMode,
 } from "./browserManager.js";
@@ -115,9 +116,14 @@ export async function createCaptureSession(
   const forceScreenshot = config?.forceScreenshot ?? DEFAULT_CONFIG.forceScreenshot;
   const preMode: CaptureMode =
     headlessShell && isLinux && !forceScreenshot ? "beginframe" : "screenshot";
+  const requestedGpuMode = config?.browserGpuMode ?? DEFAULT_CONFIG.browserGpuMode;
+  const resolvedGpuMode = await resolveBrowserGpuMode(requestedGpuMode, {
+    chromePath: headlessShell ?? undefined,
+    browserTimeout: config?.browserTimeout,
+  });
   const chromeArgs = buildChromeArgs(
     { width: options.width, height: options.height, captureMode: preMode },
-    config,
+    { ...config, browserGpuMode: resolvedGpuMode },
   );
 
   const { browser, captureMode } = await acquireBrowser(chromeArgs, config);

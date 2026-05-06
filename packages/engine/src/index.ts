@@ -50,6 +50,7 @@ export {
   acquireBrowser,
   releaseBrowser,
   resolveHeadlessShellPath,
+  resolveBrowserGpuMode,
   buildChromeArgs,
   ENABLE_BROWSER_POOL,
   type BuildChromeArgsOptions,
