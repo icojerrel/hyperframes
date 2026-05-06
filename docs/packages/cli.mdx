@@ -129,6 +129,10 @@ This is suppressed in CI environments, non-TTY shells, and when `HYPERFRAMES_NO_
     ```bash
     npx hyperframes render --output output.mp4
     ```
+    Render a specific composition instead of `index.html`:
+    ```bash
+    npx hyperframes render -c compositions/intro.html -o intro.mp4
+    ```
     For deterministic output, add `--docker`:
     ```bash
     npx hyperframes render --docker --output output.mp4

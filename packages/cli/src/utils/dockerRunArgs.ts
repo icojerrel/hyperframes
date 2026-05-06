@@ -30,6 +30,7 @@ export interface DockerRenderOptions {
   videoBitrate?: string;
   quiet: boolean;
   variables?: Record<string, unknown>;
+  entryFile?: string;
 }
 
 export function buildDockerRunArgs(input: DockerRunArgsInput): string[] {
@@ -67,5 +68,6 @@ export function buildDockerRunArgs(input: DockerRunArgsInput): string[] {
     ...(options.variables && Object.keys(options.variables).length > 0
       ? ["--variables", JSON.stringify(options.variables)]
       : []),
+    ...(options.entryFile ? ["--composition", options.entryFile] : []),
   ];
 }

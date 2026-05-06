@@ -158,6 +158,37 @@ describe("renderLocal browser GPU config", () => {
     expect(producerState.createdJobs[0]?.variables).toBeUndefined();
   });
 
+  it("forwards entryFile to createRenderJob when --composition is set", async () => {
+    const { renderLocal } = await import("./render.js");
+    await renderLocal("/tmp/project", "/tmp/out.mp4", {
+      fps: 30,
+      quality: "standard",
+      format: "mp4",
+      gpu: false,
+      browserGpu: false,
+      hdrMode: "auto",
+      quiet: true,
+      entryFile: "compositions/intro.html",
+    });
+
+    expect(producerState.createdJobs[0]?.entryFile).toBe("compositions/intro.html");
+  });
+
+  it("omits entryFile from createRenderJob when --composition is not set", async () => {
+    const { renderLocal } = await import("./render.js");
+    await renderLocal("/tmp/project", "/tmp/out.mp4", {
+      fps: 30,
+      quality: "standard",
+      format: "mp4",
+      gpu: false,
+      browserGpu: false,
+      hdrMode: "auto",
+      quiet: true,
+    });
+
+    expect(producerState.createdJobs[0]?.entryFile).toBeUndefined();
+  });
+
   it("can force the CLI process to exit after a successful local render", async () => {
     vi.useFakeTimers();
     const exit = vi
