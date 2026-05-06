@@ -107,7 +107,7 @@ describe("bundleToSingleHtml", () => {
     // the separator, parse would fail with an unexpected-token error somewhere
     // around the chunk boundary.
     const { transformSync } = await import("esbuild");
-    const re = /<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi;
+    const re = /<script\b[^>]*>([\s\S]*?)<\/script[^>]*>/gi;
     let m: RegExpExecArray | null;
     while ((m = re.exec(bundled)) !== null) {
       const body = m[1];
