@@ -1,4 +1,5 @@
 import type { RuntimeJson, RuntimeOutboundMessage, RuntimePickerElementInfo } from "./types";
+import { swallow } from "./diagnostics";
 
 type PickerModuleDeps = {
   postMessage: (payload: RuntimeOutboundMessage) => void;
@@ -33,8 +34,9 @@ export function createPickerModule(deps: PickerModuleDeps): PickerModule {
   function emitPickerRuntimeEvent(eventName: string, detail: RuntimeJson): void {
     try {
       window.dispatchEvent(new CustomEvent(eventName, { detail }));
-    } catch {
+    } catch (err) {
       // no-op in unsupported contexts
+      swallow("runtime.picker.site1", err);
     }
   }
 

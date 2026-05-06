@@ -1,3 +1,4 @@
+import { swallow } from "./diagnostics";
 export type RuntimeMediaClip = {
   el: HTMLVideoElement | HTMLAudioElement;
   start: number;
@@ -160,8 +161,9 @@ export function syncRuntimeMedia(params: {
       try {
         // Per-element rate × global transport rate
         el.playbackRate = clip.playbackRate * params.playbackRate;
-      } catch {
+      } catch (err) {
         // ignore unsupported playbackRate
+        swallow("runtime.media.site1", err);
       }
       // Drift correction. Forcing `el.currentTime = relTime` every frame
       // causes an audible seek+rebuffer hiccup (readyState drops briefly).
@@ -194,8 +196,9 @@ export function syncRuntimeMedia(params: {
       if (drift > 0.5 && (firstTickOfClip || offsetJumped || catastrophicDrift)) {
         try {
           el.currentTime = relTime;
-        } catch {
+        } catch (err) {
           // ignore browser seek restrictions
+          swallow("runtime.media.site2", err);
         }
         // Detect failed seek: if currentTime didn't reach the target,
         // the browser can't seek past its buffered range. Common with
@@ -208,8 +211,9 @@ export function syncRuntimeMedia(params: {
           el.load();
           try {
             el.currentTime = relTime;
-          } catch {
+          } catch (err) {
             // ignore — the seek will be retried on the next tick
+            swallow("runtime.media.site3", err);
           }
         }
         // After a hard seek, clear the in-flight play guard so the next tick
