@@ -103,6 +103,29 @@ describe("resolveBrowserGpuMode", () => {
     const third = await resolveBrowserGpuMode("hardware");
     expect(third).toBe("hardware");
   });
+
+  it("deduplicates concurrent auto-mode probes by caching the in-flight Promise", async () => {
+    // Parallel coordinator fires N workers via Promise.all — without Promise-
+    // level caching, a `--workers 4` render against a no-GPU host would launch
+    // 4 simultaneous probe Chromes. Verify all concurrent callers get the
+    // exact same Promise reference (proving the probe runs once, not N times).
+    const p1 = resolveBrowserGpuMode("auto", {
+      chromePath: "/definitely/not/a/real/chrome/binary",
+      browserTimeout: 2000,
+    });
+    const p2 = resolveBrowserGpuMode("auto", {
+      chromePath: "/definitely/not/a/real/chrome/binary",
+      browserTimeout: 2000,
+    });
+    const p3 = resolveBrowserGpuMode("auto", {
+      chromePath: "/definitely/not/a/real/chrome/binary",
+      browserTimeout: 2000,
+    });
+    expect(p1).toBe(p2);
+    expect(p2).toBe(p3);
+    const results = await Promise.all([p1, p2, p3]);
+    expect(results).toEqual(["software", "software", "software"]);
+  });
 });
 
 describe("forceReleaseBrowser", () => {

@@ -137,15 +137,18 @@ async function probeBeginFrameSupport(browser: Browser): Promise<boolean> {
 }
 
 /**
- * Cached result of `resolveBrowserGpuMode("auto", ...)` for the lifetime of
- * this process. The probe launches a transient Chrome with hardware args and
- * checks whether `canvas.getContext("webgl")` returns a context. Result is
- * memoised because the answer is a property of the host (GPU/driver
- * availability) and cannot meaningfully change inside one process.
+ * Cached *in-flight or resolved* probe Promise for `resolveBrowserGpuMode("auto", ...)`.
+ *
+ * Caching the Promise (rather than the resolved value) deduplicates concurrent
+ * callers — the parallel coordinator runs N workers via `Promise.all`, so a
+ * `--workers 4` render against a no-GPU host would otherwise fire 4
+ * simultaneous probe Chromes. The first call assigns the Promise and every
+ * other concurrent caller awaits the same one, paying the ~240 ms probe cost
+ * exactly once per process lifetime.
  *
  * Exported for tests; production callers go through `resolveBrowserGpuMode`.
  */
-export let _autoBrowserGpuModeCache: "software" | "hardware" | undefined;
+export let _autoBrowserGpuModeCache: Promise<"software" | "hardware"> | undefined;
 
 /** Test-only: reset the cached probe result. */
 export function _resetAutoBrowserGpuModeCacheForTests(): void {
@@ -158,8 +161,8 @@ export function _resetAutoBrowserGpuModeCacheForTests(): void {
  * For `"software"` / `"hardware"` this is a pure pass-through. For `"auto"`
  * it launches a tiny Chrome with the platform's hardware GPU args, runs a
  * one-shot WebGL availability probe, and falls back to `"software"` if
- * hardware-mode WebGL is unavailable. The probe result is cached for the
- * process lifetime — a multi-render run pays the ~1-2 s cost once.
+ * hardware-mode WebGL is unavailable. The Promise is cached for the process
+ * lifetime, so concurrent callers (parallel workers) share the same probe.
  *
  * Any failure (Chrome launch error, navigation timeout, missing canvas API,
  * etc.) is treated as a `"software"` fallback. The render path with
@@ -167,7 +170,7 @@ export function _resetAutoBrowserGpuModeCacheForTests(): void {
  * safe failure mode; misclassifying toward hardware would error on the real
  * render.
  */
-export async function resolveBrowserGpuMode(
+export function resolveBrowserGpuMode(
   mode: EngineConfig["browserGpuMode"],
   options: {
     chromePath?: string;
@@ -175,56 +178,75 @@ export async function resolveBrowserGpuMode(
     platform?: NodeJS.Platform;
   } = {},
 ): Promise<"software" | "hardware"> {
-  if (mode !== "auto") return mode;
-  if (_autoBrowserGpuModeCache !== undefined) return _autoBrowserGpuModeCache;
+  if (mode !== "auto") return Promise.resolve(mode);
+  if (_autoBrowserGpuModeCache) return _autoBrowserGpuModeCache;
 
-  const platform = options.platform ?? process.platform;
-  const browserTimeout = options.browserTimeout ?? DEFAULT_CONFIG.browserTimeout;
-  const executablePath = options.chromePath ?? resolveHeadlessShellPath({});
+  _autoBrowserGpuModeCache = (async () => {
+    const platform = options.platform ?? process.platform;
+    const browserTimeout = options.browserTimeout ?? DEFAULT_CONFIG.browserTimeout;
+    const executablePath = options.chromePath ?? resolveHeadlessShellPath({});
 
-  const probeArgs = [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--enable-webgl",
-    "--ignore-gpu-blocklist",
-    ...getBrowserGpuArgs("hardware", platform),
-  ];
+    const probeArgs = [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--enable-webgl",
+      "--ignore-gpu-blocklist",
+      ...getBrowserGpuArgs("hardware", platform),
+    ];
 
-  const ppt = await getPuppeteer().catch(() => null);
-  if (!ppt) {
-    _autoBrowserGpuModeCache = "software";
-    return _autoBrowserGpuModeCache;
-  }
+    const ppt = await getPuppeteer().catch(() => null);
+    if (!ppt) {
+      logResolvedBrowserGpuMode("software", "puppeteer unavailable");
+      return "software" as const;
+    }
 
-  let probeBrowser: Browser | undefined;
-  try {
-    probeBrowser = await ppt.launch({
-      headless: true,
-      args: probeArgs,
-      defaultViewport: { width: 64, height: 64 },
-      executablePath,
-      timeout: browserTimeout,
-    });
-    const page = await probeBrowser.newPage();
-    const hasWebGL = await page.evaluate(() => {
-      try {
-        const c = document.createElement("canvas");
-        const gl =
-          c.getContext("webgl") || (c.getContext("experimental-webgl") as RenderingContext | null);
-        return gl !== null;
-      } catch {
-        return false;
-      }
-    });
-    _autoBrowserGpuModeCache = hasWebGL ? "hardware" : "software";
-  } catch {
-    _autoBrowserGpuModeCache = "software";
-  } finally {
-    await probeBrowser?.close().catch(() => {});
-  }
+    let probeBrowser: Browser | undefined;
+    try {
+      probeBrowser = await ppt.launch({
+        headless: true,
+        args: probeArgs,
+        defaultViewport: { width: 64, height: 64 },
+        executablePath,
+        timeout: browserTimeout,
+      });
+      const page = await probeBrowser.newPage();
+      const hasWebGL = await page.evaluate(() => {
+        try {
+          const c = document.createElement("canvas");
+          const gl =
+            c.getContext("webgl") ||
+            (c.getContext("experimental-webgl") as RenderingContext | null);
+          return gl !== null;
+        } catch {
+          return false;
+        }
+      });
+      const resolved = hasWebGL ? ("hardware" as const) : ("software" as const);
+      logResolvedBrowserGpuMode(resolved, hasWebGL ? "WebGL probe succeeded" : "WebGL unavailable");
+      return resolved;
+    } catch (err) {
+      logResolvedBrowserGpuMode(
+        "software",
+        `probe failed (${err instanceof Error ? err.message : String(err)})`,
+      );
+      return "software" as const;
+    } finally {
+      await probeBrowser?.close().catch(() => {});
+    }
+  })();
 
   return _autoBrowserGpuModeCache;
+}
+
+/**
+ * Single observability surface for the auto-detect outcome. Logged exactly
+ * once per process (the probe runs once); without this line, a regression
+ * to "always software even with a GPU present" would be invisible in
+ * production. Goes to stderr to stay out of stdout pipelines.
+ */
+function logResolvedBrowserGpuMode(resolved: "hardware" | "software", reason: string): void {
+  console.error(`[hyperframes] browserGpuMode auto → ${resolved} (${reason})`);
 }
 
 export async function acquireBrowser(
