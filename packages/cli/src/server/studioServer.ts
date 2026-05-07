@@ -216,6 +216,7 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
             fps: opts.fps as 24 | 30 | 60,
             quality: opts.quality as "draft" | "standard" | "high",
             format: opts.format,
+            outputResolution: opts.outputResolution,
           });
           const startTime = Date.now();
           const onProgress = (j: { progress: number; currentStage?: string }) => {

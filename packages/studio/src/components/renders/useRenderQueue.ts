@@ -11,6 +11,8 @@ export interface RenderJob {
   durationMs?: number;
 }
 
+export type ResolutionPreset = "landscape" | "portrait" | "landscape-4k" | "portrait-4k";
+
 export function useRenderQueue(projectId: string | null) {
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -63,16 +65,26 @@ export function useRenderQueue(projectId: string | null) {
       fps = 30,
       quality: "draft" | "standard" | "high" = "standard",
       format: "mp4" | "webm" | "mov" = "mp4",
+      resolution: ResolutionPreset | "auto" = "auto",
     ) => {
       if (!projectId) return;
 
       const startTime = Date.now();
+      // "auto" means "render at the composition's authored size" — omit the
+      // field entirely so the producer's resolveDeviceScaleFactor returns 1.
+      // Sending the string "auto" would fail the route's validation set.
+      const body: { fps: number; quality: string; format: string; resolution?: string } = {
+        fps,
+        quality,
+        format,
+      };
+      if (resolution !== "auto") body.resolution = resolution;
       let res: Response;
       try {
         res = await fetch(`/api/projects/${projectId}/render`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fps, quality, format }),
+          body: JSON.stringify(body),
         });
       } catch {
         const failedJob: RenderJob = {

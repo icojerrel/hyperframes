@@ -77,6 +77,7 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
       fps: 24 | 30 | 60;
       quality: "draft" | "standard" | "high";
       format: string;
+      outputResolution?: "landscape" | "portrait" | "landscape-4k" | "portrait-4k";
     }) => unknown;
     executeRenderJob: (
       job: unknown,
@@ -244,6 +245,7 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
             fps: opts.fps as 24 | 30 | 60,
             quality: opts.quality as "draft" | "standard" | "high",
             format: opts.format,
+            outputResolution: opts.outputResolution,
           });
           const onProgress = (j: { progress: number; currentStage?: string }) => {
             state.progress = j.progress;
