@@ -207,6 +207,35 @@ describe("renderLocal browser GPU config", () => {
     expect(producerState.createdJobs[0]?.entryFile).toBeUndefined();
   });
 
+  it("forwards outputResolution to createRenderJob when --resolution is set", async () => {
+    await renderLocal("/tmp/project", "/tmp/out.mp4", {
+      fps: 30,
+      quality: "standard",
+      format: "mp4",
+      gpu: false,
+      browserGpuMode: "software",
+      hdrMode: "auto",
+      quiet: true,
+      outputResolution: "landscape-4k",
+    });
+
+    expect(producerState.createdJobs[0]?.outputResolution).toBe("landscape-4k");
+  });
+
+  it("omits outputResolution from createRenderJob by default", async () => {
+    await renderLocal("/tmp/project", "/tmp/out.mp4", {
+      fps: 30,
+      quality: "standard",
+      format: "mp4",
+      gpu: false,
+      browserGpuMode: "software",
+      hdrMode: "auto",
+      quiet: true,
+    });
+
+    expect(producerState.createdJobs[0]?.outputResolution).toBeUndefined();
+  });
+
   it("can force the CLI process to exit after a successful local render", async () => {
     vi.useFakeTimers();
     const exit = vi

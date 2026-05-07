@@ -616,9 +616,11 @@ export function resolveDeviceScaleFactor(input: {
     );
   }
   const target = CANVAS_DIMENSIONS[input.outputResolution];
-  const widthRatio = target.width / input.compositionWidth;
-  const heightRatio = target.height / input.compositionHeight;
-  if (widthRatio !== heightRatio) {
+  // Aspect-ratio compare via cross-multiplication so the equality is integer-
+  // safe. Float division (`target.width / compositionWidth`) loses precision
+  // for non-power-of-2 ratios (e.g. cinema 4K 4096×2160 = 1.8963…) and a
+  // future preset could trip a false-mismatch on otherwise valid input.
+  if (target.width * input.compositionHeight !== target.height * input.compositionWidth) {
     throw new Error(
       `outputResolution ${input.outputResolution} (${target.width}×${target.height}) ` +
         `does not match the aspect ratio of the composition ` +
@@ -626,6 +628,8 @@ export function resolveDeviceScaleFactor(input: {
         `Pick a preset whose orientation matches.`,
     );
   }
+  // Aspect ratios match → widthRatio === heightRatio. Compute once.
+  const widthRatio = target.width / input.compositionWidth;
   if (widthRatio < 1) {
     throw new Error(
       `outputResolution ${input.outputResolution} (${target.width}×${target.height}) ` +

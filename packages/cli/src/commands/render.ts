@@ -253,6 +253,18 @@ export default defineCommand({
         );
         process.exit(1);
       }
+      // Reject the --resolution + --hdr combination at the CLI layer so the
+      // user sees the friendly errorBox before any work directories or
+      // ffmpeg processes spin up. The orchestrator also enforces this via
+      // resolveDeviceScaleFactor — defense in depth.
+      if (args.hdr) {
+        errorBox(
+          "Conflicting flags",
+          "--resolution cannot be combined with --hdr. The HDR pipeline composites at composition dimensions and does not yet support supersampling.",
+          "Render in two passes: HDR at composition resolution, then upscale separately with ffmpeg.",
+        );
+        process.exit(1);
+      }
     }
 
     // ── Validate workers ──────────────────────────────────────────────────
@@ -369,7 +381,11 @@ export default defineCommand({
       );
       console.log(c.dim("   " + fps + "fps \u00B7 " + quality + " \u00B7 " + workerLabel));
       if (outputResolution) {
-        console.log(c.dim("   Output resolution: " + outputResolution + " (supersampled via DPR)"));
+        // Don't claim "supersampled" — when the composition is already at the
+        // target dimensions, the DPR resolves to 1 and no supersampling
+        // happens. We don't have the composition's dims at this point in the
+        // CLI, so describe the intent rather than the mechanism.
+        console.log(c.dim("   Output resolution: " + outputResolution));
       }
       if (useGpu || browserGpuMode !== "software") {
         const gpuModes = [
