@@ -70,8 +70,12 @@ function createFrameSourceCache(
   function evictOldest(): void {
     const oldestKey = cache.keys().next().value;
     if (!oldestKey) return;
-    totalBytes = Math.max(0, totalBytes - (cache.get(oldestKey)?.length ?? 0));
+    // Snapshot the value before deleting so the byte-size derivation can't
+    // accidentally read post-delete (a future reorder would silently lose
+    // accounting and surface as `totalBytes` drifting out of sync).
+    const dropped = cache.get(oldestKey);
     cache.delete(oldestKey);
+    totalBytes = Math.max(0, totalBytes - (dropped?.length ?? 0));
     evictions++;
   }
 

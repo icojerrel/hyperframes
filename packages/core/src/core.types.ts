@@ -19,8 +19,6 @@ export interface Asset {
 export type TimelineElementType = "video" | "image" | "text" | "audio" | "composition";
 export type MediaElementType = "video" | "image" | "audio";
 
-export type CanvasResolution = "landscape" | "portrait" | "landscape-4k" | "portrait-4k";
-
 export const CANVAS_DIMENSIONS = {
   landscape: { width: 1920, height: 1080 },
   portrait: { width: 1080, height: 1920 },
@@ -28,6 +26,15 @@ export const CANVAS_DIMENSIONS = {
   "portrait-4k": { width: 2160, height: 3840 },
 } as const;
 
+// Single source of truth: derive the type from the table so adding a preset
+// extends the union automatically. Avoids the prior `as readonly CanvasResolution[]`
+// cast on `VALID_CANVAS_RESOLUTIONS` quietly drifting if the table grew but
+// the union didn't.
+export type CanvasResolution = keyof typeof CANVAS_DIMENSIONS;
+
+// `Object.keys` ordering matches insertion order in `CANVAS_DIMENSIONS` on
+// every supported JS engine; tests pin the order in `index.test.ts`. Reorder
+// the table above with care.
 export const VALID_CANVAS_RESOLUTIONS = Object.keys(
   CANVAS_DIMENSIONS,
 ) as readonly CanvasResolution[];
