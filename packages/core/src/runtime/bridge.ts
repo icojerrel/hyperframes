@@ -1,3 +1,4 @@
+import { swallow } from "./diagnostics";
 import type { RuntimeBridgeControlMessage, RuntimeOutboundMessage } from "./types";
 
 type BridgeDeps = {
@@ -15,8 +16,9 @@ type BridgeDeps = {
 export function postRuntimeMessage(payload: RuntimeOutboundMessage): void {
   try {
     window.parent.postMessage(payload, "*");
-  } catch {
-    // Ignore cross-frame posting failures.
+  } catch (err) {
+    // Cross-frame posting can throw if the parent is gone or origin-isolated.
+    swallow("bridge.postMessage", err);
   }
 }
 
@@ -104,8 +106,9 @@ function flashElements(selectors: string[], duration: number): void {
         el.classList.add("__hf-flash");
         setTimeout(() => el.classList.remove("__hf-flash"), duration);
       });
-    } catch {
+    } catch (err) {
       // Invalid selector — skip
+      swallow("bridge.flashElements.querySelector", err);
     }
   }
 }
