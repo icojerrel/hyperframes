@@ -114,8 +114,14 @@ export async function createCaptureSession(
   const headlessShell = resolveHeadlessShellPath(config);
   const isLinux = process.platform === "linux";
   const forceScreenshot = config?.forceScreenshot ?? DEFAULT_CONFIG.forceScreenshot;
+  // BeginFrame's screenshot does not honor a viewport `deviceScaleFactor`
+  // (the captured surface is sized by the OS window in CSS pixels regardless
+  // of `Emulation.setDeviceMetricsOverride`'s DPR). When supersampling we
+  // need explicit clip+scale on `Page.captureScreenshot`, so fall back to
+  // the screenshot path for any DPR > 1.
+  const supersampling = (options.deviceScaleFactor ?? 1) > 1;
   const preMode: CaptureMode =
-    headlessShell && isLinux && !forceScreenshot ? "beginframe" : "screenshot";
+    headlessShell && isLinux && !forceScreenshot && !supersampling ? "beginframe" : "screenshot";
   const requestedGpuMode = config?.browserGpuMode ?? DEFAULT_CONFIG.browserGpuMode;
   const resolvedGpuMode = await resolveBrowserGpuMode(requestedGpuMode, {
     chromePath: headlessShell ?? undefined,
