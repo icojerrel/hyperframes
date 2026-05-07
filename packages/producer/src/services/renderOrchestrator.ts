@@ -29,6 +29,7 @@ import {
   symlinkSync,
 } from "fs";
 import { parseHTML } from "linkedom";
+import { CANVAS_DIMENSIONS, type CanvasResolution } from "@hyperframes/core";
 import {
   type EngineConfig,
   resolveConfig,
@@ -279,6 +280,24 @@ export interface RenderConfig {
    * `--variables-file <path>`. Must be a JSON-serializable plain object.
    */
   variables?: Record<string, unknown>;
+  /**
+   * Override the output resolution. The composition's intrinsic
+   * `data-width` / `data-height` continue to drive page layout (Chrome
+   * viewport), and supersampling is achieved by setting Chrome's
+   * `deviceScaleFactor` so the captured screenshot lands at the requested
+   * dimensions. Passing a 4K preset on a 1080p composition therefore
+   * produces a 4K output without rewriting any composition HTML.
+   *
+   * Constraint: the requested dimensions must be an integer multiple of
+   * the composition's intrinsic dimensions (so DPR is a clean integer).
+   * Non-integer scales are rejected with an explanatory error before any
+   * frames are captured.
+   *
+   * Not yet supported with HDR (the layered HDR compositor processes
+   * pixel buffers at composition dimensions and would need parallel
+   * scaling); the orchestrator errors when both are set.
+   */
+  outputResolution?: CanvasResolution;
 }
 
 export interface RenderPerfSummary {
@@ -561,6 +580,68 @@ export function projectBrowserEndToCompositionTimeline(
   browserEnd: number,
 ): number {
   return browserEnd + (existingStart - browserStart);
+}
+
+/**
+ * Translate the user-facing `--resolution` flag into a Chrome
+ * `deviceScaleFactor`. The composition's intrinsic dimensions stay the
+ * page-layout viewport; the screenshot lands at output dims via DPR.
+ *
+ * The scale must be a positive integer ≥ 1 — fractional DPRs introduce
+ * visible aliasing and we'd rather fail loudly than produce a blurry
+ * 4K render. Downsampling (output < composition) is rejected because
+ * the user is unlikely to have intended it; if the use case appears
+ * we can plumb a separate flag.
+ *
+ * Throws on:
+ *   - HDR + outputResolution combination (HDR layered compositor would
+ *     need parallel scaling for its raw pixel buffers).
+ *   - Non-integer scale (e.g. 720p composition, 4K output → 3× height
+ *     but the width ratio is also 3× ✓; 1080p portrait → 4K landscape
+ *     would mismatch).
+ *   - Output dimensions smaller than composition dimensions.
+ */
+export function resolveDeviceScaleFactor(input: {
+  compositionWidth: number;
+  compositionHeight: number;
+  outputResolution: CanvasResolution | undefined;
+  hdrRequested: boolean;
+}): number {
+  if (!input.outputResolution) return 1;
+  if (input.hdrRequested) {
+    throw new Error(
+      "outputResolution cannot be combined with hdrMode='force-hdr'. " +
+        "HDR rendering composites at composition dimensions and does not yet " +
+        "support supersampling. Pick one or render in two passes.",
+    );
+  }
+  const target = CANVAS_DIMENSIONS[input.outputResolution];
+  const widthRatio = target.width / input.compositionWidth;
+  const heightRatio = target.height / input.compositionHeight;
+  if (widthRatio !== heightRatio) {
+    throw new Error(
+      `outputResolution ${input.outputResolution} (${target.width}×${target.height}) ` +
+        `does not match the aspect ratio of the composition ` +
+        `(${input.compositionWidth}×${input.compositionHeight}). ` +
+        `Pick a preset whose orientation matches.`,
+    );
+  }
+  if (widthRatio < 1) {
+    throw new Error(
+      `outputResolution ${input.outputResolution} (${target.width}×${target.height}) ` +
+        `is smaller than the composition (${input.compositionWidth}×${input.compositionHeight}). ` +
+        `Downsampling via --resolution is not supported.`,
+    );
+  }
+  if (!Number.isInteger(widthRatio)) {
+    throw new Error(
+      `outputResolution ${input.outputResolution} requires a non-integer ` +
+        `device scale factor (${widthRatio}×) to upsample from ` +
+        `${input.compositionWidth}×${input.compositionHeight}. ` +
+        `Pick a preset that's an integer multiple, or rescale the composition.`,
+    );
+  }
+  return widthRatio;
 }
 
 function updateJobStatus(
@@ -2053,6 +2134,22 @@ export async function executeRenderJob(
       height: compiled.height,
     };
     const { width, height } = composition;
+    const deviceScaleFactor = resolveDeviceScaleFactor({
+      compositionWidth: width,
+      compositionHeight: height,
+      outputResolution: job.config.outputResolution,
+      hdrRequested: job.config.hdrMode === "force-hdr",
+    });
+    if (deviceScaleFactor > 1) {
+      log.info("Supersampling composition via deviceScaleFactor", {
+        compositionWidth: width,
+        compositionHeight: height,
+        outputResolution: job.config.outputResolution,
+        outputWidth: width * deviceScaleFactor,
+        outputHeight: height * deviceScaleFactor,
+        deviceScaleFactor,
+      });
+    }
 
     const probeStart = Date.now();
     const needsBrowser = composition.duration <= 0 || compiled.unresolvedCompositions.length > 0;
@@ -2077,6 +2174,7 @@ export async function executeRenderJob(
         fps: job.config.fps,
         format: needsAlpha ? "png" : "jpeg",
         quality: needsAlpha ? undefined : 80,
+        deviceScaleFactor,
       };
       probeSession = await createCaptureSession(
         fileServer.url,
@@ -2543,6 +2641,7 @@ export async function executeRenderJob(
       format: needsAlpha ? "png" : "jpeg",
       quality: needsAlpha ? undefined : job.config.quality === "draft" ? 80 : 95,
       variables: job.config.variables,
+      deviceScaleFactor,
     };
 
     // Capture sessions do not need native browser metadata for videos whose
@@ -3915,7 +4014,7 @@ export async function executeRenderJob(
       chunkSizeFrames: enableChunkedEncode ? chunkedEncodeSize : null,
       compositionDurationSeconds: composition.duration,
       totalFrames: totalFrames,
-      resolution: { width, height },
+      resolution: { width: width * deviceScaleFactor, height: height * deviceScaleFactor },
       videoCount: composition.videos.length,
       audioCount: composition.audios.length,
       stages: perfStages,

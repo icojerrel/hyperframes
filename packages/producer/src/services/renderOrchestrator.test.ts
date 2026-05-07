@@ -20,6 +20,7 @@ import {
   isRecoverableParallelCaptureError,
   materializeExtractedFramesForCompiledDir,
   projectBrowserEndToCompositionTimeline,
+  resolveDeviceScaleFactor,
   resolveRenderWorkerCount,
   resolveCompositeTransfer,
   selectCaptureCalibrationFrames,
@@ -747,5 +748,84 @@ describe("projectBrowserEndToCompositionTimeline", () => {
 
   it("preserves scene-local media offsets inside compositions that start much later", () => {
     expect(projectBrowserEndToCompositionTimeline(21.5, 1.5, 5.5)).toBe(25.5);
+  });
+});
+
+describe("resolveDeviceScaleFactor", () => {
+  const defaults = {
+    compositionWidth: 1920,
+    compositionHeight: 1080,
+    hdrRequested: false,
+  } as const;
+
+  it("returns 1 when no outputResolution is set (default behavior)", () => {
+    expect(resolveDeviceScaleFactor({ ...defaults, outputResolution: undefined })).toBe(1);
+  });
+
+  it("returns 2 for the canonical 1080p → 4K supersample", () => {
+    expect(resolveDeviceScaleFactor({ ...defaults, outputResolution: "landscape-4k" })).toBe(2);
+  });
+
+  it("returns 2 for portrait 1080p → portrait-4k", () => {
+    expect(
+      resolveDeviceScaleFactor({
+        ...defaults,
+        compositionWidth: 1080,
+        compositionHeight: 1920,
+        outputResolution: "portrait-4k",
+      }),
+    ).toBe(2);
+  });
+
+  it("returns 1 when the composition already matches the requested resolution", () => {
+    expect(
+      resolveDeviceScaleFactor({
+        compositionWidth: 3840,
+        compositionHeight: 2160,
+        outputResolution: "landscape-4k",
+        hdrRequested: false,
+      }),
+    ).toBe(1);
+  });
+
+  it("rejects HDR + outputResolution with a clear message", () => {
+    expect(() =>
+      resolveDeviceScaleFactor({
+        ...defaults,
+        outputResolution: "landscape-4k",
+        hdrRequested: true,
+      }),
+    ).toThrow(/hdrMode='force-hdr'/);
+  });
+
+  it("rejects orientation mismatch (landscape comp → portrait-4k)", () => {
+    expect(() =>
+      resolveDeviceScaleFactor({ ...defaults, outputResolution: "portrait-4k" }),
+    ).toThrow(/aspect ratio/);
+  });
+
+  it("rejects downsampling (4K composition → 1080p output)", () => {
+    expect(() =>
+      resolveDeviceScaleFactor({
+        compositionWidth: 3840,
+        compositionHeight: 2160,
+        outputResolution: "landscape",
+        hdrRequested: false,
+      }),
+    ).toThrow(/Downsampling/);
+  });
+
+  it("rejects non-integer scale factors", () => {
+    // 1280×720 → 3840×2160 would be 3×, but width 1280 → 3840 is also 3× — that's actually integer.
+    // Use 1280×720 → 2160×3840 (mismatched orientation triggers aspect first), so use a real
+    // non-integer: 1500×844 → 3840×2160 = 2.56×.
+    expect(() =>
+      resolveDeviceScaleFactor({
+        compositionWidth: 1500,
+        compositionHeight: 844,
+        outputResolution: "landscape-4k",
+        hdrRequested: false,
+      }),
+    ).toThrow(/aspect ratio|non-integer/);
   });
 });

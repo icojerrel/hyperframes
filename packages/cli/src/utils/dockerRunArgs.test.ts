@@ -239,4 +239,19 @@ describe("buildDockerRunArgs", () => {
     const args = buildDockerRunArgs({ ...FIXED_INPUT, options: BASE });
     expect(args).not.toContain("--composition");
   });
+
+  it("forwards --resolution to the container when outputResolution is set", () => {
+    const args = buildDockerRunArgs({
+      ...FIXED_INPUT,
+      options: { ...BASE, outputResolution: "landscape-4k" },
+    });
+    const idx = args.indexOf("--resolution");
+    expect(idx).toBeGreaterThan(-1);
+    expect(args[idx + 1]).toBe("landscape-4k");
+  });
+
+  it("omits --resolution when outputResolution is not set", () => {
+    const args = buildDockerRunArgs({ ...FIXED_INPUT, options: BASE });
+    expect(args).not.toContain("--resolution");
+  });
 });

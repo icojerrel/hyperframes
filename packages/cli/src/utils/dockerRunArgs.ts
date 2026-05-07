@@ -31,6 +31,8 @@ export interface DockerRenderOptions {
   quiet: boolean;
   variables?: Record<string, unknown>;
   entryFile?: string;
+  /** Output resolution preset (e.g. "landscape-4k"). Forwarded as `--resolution`. */
+  outputResolution?: string;
 }
 
 export function buildDockerRunArgs(input: DockerRunArgsInput): string[] {
@@ -69,5 +71,6 @@ export function buildDockerRunArgs(input: DockerRunArgsInput): string[] {
       ? ["--variables", JSON.stringify(options.variables)]
       : []),
     ...(options.entryFile ? ["--composition", options.entryFile] : []),
+    ...(options.outputResolution ? ["--resolution", options.outputResolution] : []),
   ];
 }

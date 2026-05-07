@@ -5,6 +5,10 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, rmSync }
 export const examples: Example[] = [
   ["Render to MP4", "hyperframes render --output output.mp4"],
   ["Render a specific composition", "hyperframes render -c compositions/intro.html -o intro.mp4"],
+  [
+    "Upsample any composition to 4K (supersamples via Chrome DPR)",
+    "hyperframes render --resolution 4k --output 4k.mp4",
+  ],
   ["Render transparent overlay (ProRes)", "hyperframes render --format mov --output overlay.mov"],
   ["Render transparent WebM overlay", "hyperframes render --format webm --output overlay.webm"],
   [
@@ -47,7 +51,34 @@ import {
   validateVariables,
   formatVariableValidationIssue,
   type VariableValidationIssue,
+  type CanvasResolution,
 } from "@hyperframes/core";
+
+const VALID_RENDER_RESOLUTIONS: readonly CanvasResolution[] = [
+  "landscape",
+  "portrait",
+  "landscape-4k",
+  "portrait-4k",
+] as const;
+
+const RENDER_RESOLUTION_ALIASES: Record<string, CanvasResolution> = {
+  "1080p": "landscape",
+  hd: "landscape",
+  "1080p-portrait": "portrait",
+  "portrait-1080p": "portrait",
+  "4k": "landscape-4k",
+  uhd: "landscape-4k",
+  "4k-portrait": "portrait-4k",
+};
+
+function normalizeRenderResolutionFlag(input: string | undefined): CanvasResolution | undefined {
+  if (!input) return undefined;
+  const lowered = input.toLowerCase();
+  if ((VALID_RENDER_RESOLUTIONS as readonly string[]).includes(lowered)) {
+    return lowered as CanvasResolution;
+  }
+  return RENDER_RESOLUTION_ALIASES[lowered];
+}
 
 const VALID_FPS = new Set([24, 30, 60]);
 const VALID_QUALITY = new Set(["draft", "standard", "high"]);
@@ -177,6 +208,11 @@ export default defineCommand({
         "Fail render if any --variables key is undeclared or has a wrong type vs the composition's data-composition-variables. Without this flag, mismatches are warnings.",
       default: false,
     },
+    resolution: {
+      type: "string",
+      description:
+        "Output resolution preset: landscape (1920x1080), portrait (1080x1920), landscape-4k (3840x2160), portrait-4k (2160x3840). Aliases: 1080p, 4k, uhd. The composition is unchanged — Chrome renders at higher DPR (deviceScaleFactor) so the captured screenshot lands at the requested dimensions. Aspect ratio must match the composition; the scale must be an integer multiple. Not yet supported with --hdr.",
+    },
   },
   async run({ args }) {
     // ── Resolve project ────────────────────────────────────────────────────
@@ -205,6 +241,19 @@ export default defineCommand({
       process.exit(1);
     }
     const format = formatRaw as "mp4" | "webm" | "mov" | "png-sequence";
+
+    // ── Validate resolution ────────────────────────────────────────────────
+    let outputResolution: CanvasResolution | undefined;
+    if (args.resolution !== undefined) {
+      outputResolution = normalizeRenderResolutionFlag(args.resolution);
+      if (!outputResolution) {
+        errorBox(
+          "Invalid resolution",
+          `Got "${args.resolution}". Must be one of: landscape, portrait, landscape-4k, portrait-4k (or aliases 1080p, 4k, uhd).`,
+        );
+        process.exit(1);
+      }
+    }
 
     // ── Validate workers ──────────────────────────────────────────────────
     let workers: number | undefined;
@@ -319,6 +368,9 @@ export default defineCommand({
         c.accent("\u25C6") + "  Rendering " + c.accent(nameLabel) + c.dim(" \u2192 " + outputPath),
       );
       console.log(c.dim("   " + fps + "fps \u00B7 " + quality + " \u00B7 " + workerLabel));
+      if (outputResolution) {
+        console.log(c.dim("   Output resolution: " + outputResolution + " (supersampled via DPR)"));
+      }
       if (useGpu || browserGpuMode !== "software") {
         const gpuModes = [
           useGpu ? "encoder GPU" : null,
@@ -452,6 +504,7 @@ export default defineCommand({
         quiet,
         variables,
         entryFile,
+        outputResolution,
         exitAfterComplete: true,
       });
     } else {
@@ -469,6 +522,7 @@ export default defineCommand({
         browserPath,
         variables,
         entryFile,
+        outputResolution,
         exitAfterComplete: true,
       });
     }
@@ -495,6 +549,13 @@ interface RenderOptions {
   variables?: Record<string, unknown>;
   entryFile?: string;
   exitAfterComplete?: boolean;
+  /**
+   * Output resolution preset. When set, the orchestrator computes a Chrome
+   * deviceScaleFactor so the screenshot lands at the requested dimensions
+   * without changing the composition. See the producer's
+   * `resolveDeviceScaleFactor` for the integer-scale + aspect constraints.
+   */
+  outputResolution?: CanvasResolution;
 }
 
 export type VariablesParseError =
@@ -788,6 +849,7 @@ async function renderDocker(
       quiet: options.quiet,
       variables: options.variables,
       entryFile: options.entryFile,
+      outputResolution: options.outputResolution,
     },
   });
 
@@ -859,6 +921,7 @@ export async function renderLocal(
     videoBitrate: options.videoBitrate,
     variables: options.variables,
     entryFile: options.entryFile,
+    outputResolution: options.outputResolution,
   });
 
   const onProgress = options.quiet
