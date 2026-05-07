@@ -1,15 +1,35 @@
 import { memo, useState, useRef, useEffect } from "react";
 import { RenderQueueItem } from "./RenderQueueItem";
-import type { RenderJob } from "./useRenderQueue";
+import type { RenderJob, ResolutionPreset } from "./useRenderQueue";
 
 interface RenderQueueProps {
   jobs: RenderJob[];
   projectId: string;
   onDelete: (jobId: string) => void;
   onClearCompleted: () => void;
-  onStartRender: (format: "mp4" | "webm" | "mov", quality: "draft" | "standard" | "high") => void;
+  onStartRender: (
+    format: "mp4" | "webm" | "mov",
+    quality: "draft" | "standard" | "high",
+    resolution: ResolutionPreset | "auto",
+  ) => void;
   isRendering: boolean;
 }
+
+const RESOLUTION_OPTIONS: { value: ResolutionPreset | "auto"; label: string; title: string }[] = [
+  { value: "auto", label: "Auto", title: "Render at the composition's authored resolution" },
+  { value: "landscape", label: "1080p", title: "1920×1080 landscape" },
+  { value: "portrait", label: "1080p ↕", title: "1080×1920 portrait" },
+  {
+    value: "landscape-4k",
+    label: "4K",
+    title: "3840×2160 — supersamples a 1080p composition via Chrome DPR. Slower, larger files.",
+  },
+  {
+    value: "portrait-4k",
+    label: "4K ↕",
+    title: "2160×3840 — supersamples a 1080p portrait composition via Chrome DPR.",
+  },
+];
 
 const FORMAT_INFO: Record<"mp4" | "webm" | "mov", { label: string; desc: string }> = {
   mp4: { label: "MP4", desc: "Best for general use. Smallest file, universal playback." },
@@ -91,11 +111,16 @@ function FormatExportButton({
   onStartRender,
   isRendering,
 }: {
-  onStartRender: (format: "mp4" | "webm" | "mov", quality: "draft" | "standard" | "high") => void;
+  onStartRender: (
+    format: "mp4" | "webm" | "mov",
+    quality: "draft" | "standard" | "high",
+    resolution: ResolutionPreset | "auto",
+  ) => void;
   isRendering: boolean;
 }) {
   const [format, setFormat] = useState<"mp4" | "webm" | "mov">("mp4");
   const [quality, setQuality] = useState<"draft" | "standard" | "high">("standard");
+  const [resolution, setResolution] = useState<ResolutionPreset | "auto">("auto");
 
   // MOV (ProRes) is a fixed-quality codec — quality selector has no effect.
   const showQuality = format !== "mov";
@@ -103,13 +128,26 @@ function FormatExportButton({
   return (
     <div className="flex items-center gap-1">
       <FormatInfoTooltip format={format} />
+      <select
+        value={resolution}
+        onChange={(e) => setResolution(e.target.value as ResolutionPreset | "auto")}
+        disabled={isRendering}
+        title={RESOLUTION_OPTIONS.find((r) => r.value === resolution)?.title}
+        className="h-5 px-1 text-[10px] rounded-l bg-neutral-800 border border-neutral-700 text-neutral-300 outline-none disabled:opacity-50"
+      >
+        {RESOLUTION_OPTIONS.map((r) => (
+          <option key={r.value} value={r.value} title={r.title}>
+            {r.label}
+          </option>
+        ))}
+      </select>
       {showQuality && (
         <select
           value={quality}
           onChange={(e) => setQuality(e.target.value as "draft" | "standard" | "high")}
           disabled={isRendering}
           title={QUALITY_OPTIONS.find((q) => q.value === quality)?.title}
-          className="h-5 px-1 text-[10px] rounded-l bg-neutral-800 border border-neutral-700 text-neutral-300 outline-none disabled:opacity-50"
+          className="h-5 px-1 text-[10px] bg-neutral-800 border border-neutral-700 text-neutral-300 outline-none disabled:opacity-50"
         >
           {QUALITY_OPTIONS.map((q) => (
             <option key={q.value} value={q.value} title={q.title}>
@@ -122,14 +160,14 @@ function FormatExportButton({
         value={format}
         onChange={(e) => setFormat(e.target.value as "mp4" | "webm" | "mov")}
         disabled={isRendering}
-        className={`h-5 px-1 text-[10px] bg-neutral-800 border border-neutral-700 text-neutral-300 outline-none disabled:opacity-50 ${showQuality ? "" : "rounded-l"}`}
+        className="h-5 px-1 text-[10px] bg-neutral-800 border border-neutral-700 text-neutral-300 outline-none disabled:opacity-50"
       >
         <option value="mp4">MP4</option>
         <option value="mov">MOV</option>
         <option value="webm">WebM</option>
       </select>
       <button
-        onClick={() => onStartRender(format, quality)}
+        onClick={() => onStartRender(format, quality, resolution)}
         disabled={isRendering}
         className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-r bg-studio-accent text-[#09090B] hover:brightness-110 transition-colors disabled:opacity-50"
       >

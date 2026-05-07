@@ -64,6 +64,13 @@ export interface StudioApiAdapter {
     fps: number;
     quality: string;
     jobId: string;
+    /**
+     * Optional output resolution preset (e.g. "landscape-4k"). When set, the
+     * producer supersamples the composition via Chrome `deviceScaleFactor`.
+     * The composition's authored dimensions are unchanged. See the
+     * `resolveDeviceScaleFactor` constraints in the producer.
+     */
+    outputResolution?: "landscape" | "portrait" | "landscape-4k" | "portrait-4k";
   }): RenderJobState;
 
   /** Optional: generate a JPEG thumbnail via Puppeteer or similar. */

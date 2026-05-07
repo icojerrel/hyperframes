@@ -145,7 +145,13 @@ For a 4K render of a 30-second composition, plan on a few minutes of wall time o
 
 The Renders panel in Studio includes a resolution dropdown next to the format and quality selectors. Pick `4K` (or `4K ↕` for portrait) and hit **Export** — the same supersampling path runs as the CLI flag, no composition edits required.
 
-The dropdown defaults to `Auto` (render at the composition's authored size). The resolution applies per render, not per project — your composition files are unchanged.
+The dropdown defaults to `Auto` (render at the composition's authored size). Available presets:
+
+- **Auto** — composition's native dimensions
+- **1080p ↔** / **1080p ↕** — 1920×1080 / 1080×1920
+- **4K ↔** / **4K ↕** — 3840×2160 / 2160×3840
+
+The resolution applies per render, not per project — your composition files are unchanged. The same [constraints](#constraints) apply; when the producer rejects a combination, the failure surfaces in the Studio render queue.
 
 You can also drive resolution from the CLI:
 
