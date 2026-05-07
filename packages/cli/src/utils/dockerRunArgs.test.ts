@@ -181,6 +181,17 @@ describe("buildDockerRunArgs", () => {
     expect(args).toContain("compositions/intro.html");
   });
 
+  it("forwards --format png-sequence to the container", () => {
+    const args = buildDockerRunArgs({
+      ...FIXED_INPUT,
+      outputFilename: "frames",
+      options: { ...BASE, format: "png-sequence" },
+    });
+    const formatIdx = args.indexOf("--format");
+    expect(formatIdx).toBeGreaterThanOrEqual(0);
+    expect(args[formatIdx + 1]).toBe("png-sequence");
+  });
+
   it("forwards --video-bitrate to the container when set", () => {
     const args = buildDockerRunArgs({
       ...FIXED_INPUT,

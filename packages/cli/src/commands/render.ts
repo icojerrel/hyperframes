@@ -1,12 +1,16 @@
 import { defineCommand } from "citty";
 import type { Example } from "./_examples.js";
-import { mkdirSync, readFileSync, statSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, rmSync } from "node:fs";
 
 export const examples: Example[] = [
   ["Render to MP4", "hyperframes render --output output.mp4"],
   ["Render a specific composition", "hyperframes render -c compositions/intro.html -o intro.mp4"],
   ["Render transparent overlay (ProRes)", "hyperframes render --format mov --output overlay.mov"],
   ["Render transparent WebM overlay", "hyperframes render --format webm --output overlay.webm"],
+  [
+    "Render PNG sequence (RGBA frames for AE/Nuke/Fusion)",
+    "hyperframes render --format png-sequence --output frames/",
+  ],
   ["High quality at 60fps", "hyperframes render --fps 60 --quality high --output hd.mp4"],
   ["Deterministic render via Docker", "hyperframes render --docker --output deterministic.mp4"],
   ["Parallel rendering with 6 workers", "hyperframes render --workers 6 --output fast.mp4"],
@@ -47,15 +51,22 @@ import {
 
 const VALID_FPS = new Set([24, 30, 60]);
 const VALID_QUALITY = new Set(["draft", "standard", "high"]);
-const VALID_FORMAT = new Set(["mp4", "webm", "mov"]);
-const FORMAT_EXT: Record<string, string> = { mp4: ".mp4", webm: ".webm", mov: ".mov" };
+const VALID_FORMAT = new Set(["mp4", "webm", "mov", "png-sequence"]);
+// `png-sequence` writes a directory of frames rather than a single muxed file,
+// so its "extension" is empty — the auto-output path becomes a directory name.
+const FORMAT_EXT: Record<string, string> = {
+  mp4: ".mp4",
+  webm: ".webm",
+  mov: ".mov",
+  "png-sequence": "",
+};
 
 const CPU_CORE_COUNT = cpus().length;
 
 export default defineCommand({
   meta: {
     name: "render",
-    description: "Render a composition to MP4, WebM, or MOV",
+    description: "Render a composition to MP4, WebM, MOV, or a PNG sequence",
   },
   args: {
     dir: {
@@ -89,7 +100,10 @@ export default defineCommand({
     },
     format: {
       type: "string",
-      description: "Output format: mp4, webm, mov (MOV/WebM render with transparency)",
+      description:
+        "Output format: mp4, webm, mov, png-sequence " +
+        "(MOV/WebM render with transparency; png-sequence writes RGBA frames " +
+        "to a directory for AE/Nuke/Fusion ingest)",
       default: "mp4",
     },
     workers: {
@@ -187,10 +201,10 @@ export default defineCommand({
     // ── Validate format ─────────────────────────────────────────────────
     const formatRaw = args.format ?? "mp4";
     if (!VALID_FORMAT.has(formatRaw)) {
-      errorBox("Invalid format", `Got "${formatRaw}". Must be mp4, webm, or mov.`);
+      errorBox("Invalid format", `Got "${formatRaw}". Must be mp4, webm, mov, or png-sequence.`);
       process.exit(1);
     }
-    const format = formatRaw as "mp4" | "webm" | "mov";
+    const format = formatRaw as "mp4" | "webm" | "mov" | "png-sequence";
 
     // ── Validate workers ──────────────────────────────────────────────────
     let workers: number | undefined;
@@ -464,7 +478,7 @@ export default defineCommand({
 interface RenderOptions {
   fps: 24 | 30 | 60;
   quality: "draft" | "standard" | "high";
-  format: "mp4" | "webm" | "mov";
+  format: "mp4" | "webm" | "mov" | "png-sequence";
   workers?: number;
   gpu: boolean;
   /**
@@ -976,7 +990,24 @@ function printRenderComplete(outputPath: string, elapsedMs: number, quiet: boole
 
   let fileSize = "unknown";
   try {
-    fileSize = formatBytes(statSync(outputPath).size);
+    const stat = statSync(outputPath);
+    if (stat.isDirectory()) {
+      // png-sequence output is a directory; sum the contained file sizes so
+      // the user sees the on-disk footprint of the deliverable rather than
+      // the platform-specific size of the directory inode itself.
+      let total = 0;
+      for (const entry of readdirSync(outputPath, { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
+        try {
+          total += statSync(join(outputPath, entry.name)).size;
+        } catch {
+          // skip unreadable entries
+        }
+      }
+      fileSize = formatBytes(total);
+    } else {
+      fileSize = formatBytes(stat.size);
+    }
   } catch {
     // file doesn't exist or is inaccessible
   }

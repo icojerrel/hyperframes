@@ -604,7 +604,7 @@ This is suppressed in CI environments, non-TTY shells, and when `HYPERFRAMES_NO_
     | Flag | Values | Default | Description |
     |------|--------|---------|-------------|
     | `--output` | path | `renders/<name>.mp4` | Output file path |
-    | `--format` | mp4, webm, mov | mp4 | Output format (WebM/MOV render with transparency) |
+    | `--format` | mp4, webm, mov, png-sequence | mp4 | Output format (WebM/MOV render with transparency; png-sequence writes a directory of RGBA PNGs) |
     | `--fps` | 24, 30, 60 | 30 | Frames per second |
     | `--quality` | draft, standard, high | standard | Encoding quality preset (drives CRF/bitrate) |
     | `--crf` | 0-51 | — | Override encoder CRF (lower = higher quality). Mutually exclusive with `--video-bitrate` |
