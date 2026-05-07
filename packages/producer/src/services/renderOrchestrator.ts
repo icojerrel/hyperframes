@@ -2562,6 +2562,7 @@ export async function executeRenderJob(
     const createRenderVideoFrameInjector = (): BeforeCaptureHook | null =>
       createVideoFrameInjector(frameLookup, {
         frameDataUriCacheLimit: cfg.frameDataUriCacheLimit,
+        frameDataUriCacheBytesLimitMb: cfg.frameDataUriCacheBytesLimitMb,
         frameSrcResolver,
       });
 

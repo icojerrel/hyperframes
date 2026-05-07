@@ -370,6 +370,7 @@ function createConfig(): EngineConfig {
     hdrAutoDetect: true,
     audioGain: 1,
     frameDataUriCacheLimit: 256,
+    frameDataUriCacheBytesLimitMb: 1500,
     playerReadyTimeout: 45000,
     renderReadyTimeout: 15000,
     verifyRuntime: true,

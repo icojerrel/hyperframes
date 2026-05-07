@@ -76,7 +76,21 @@ export interface EngineConfig {
 
   // ── Media ────────────────────────────────────────────────────────────
   audioGain: number;
+  /**
+   * Hard upper bound on entries kept in the video frame data URI cache.
+   * Acts as a sanity cap; the byte budget below normally fires first on
+   * high-resolution renders. At 1080p with ~6 MB per JPEG frame the default
+   * 256 entries fit inside ~1.5 GB. At 4K the byte budget evicts long
+   * before this cap is reached.
+   */
   frameDataUriCacheLimit: number;
+  /**
+   * Memory budget for the cache, in megabytes. Eviction kicks in once the
+   * sum of cached data-URI string lengths exceeds this. Sized so a worker
+   * stays comfortably under a few GB even at 4K (where each PNG frame is
+   * ~25 MB and the base64 data URI is ~33 MB).
+   */
+  frameDataUriCacheBytesLimitMb: number;
 
   // ── Timeouts ─────────────────────────────────────────────────────────
   playerReadyTimeout: number;
@@ -149,6 +163,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
 
   audioGain: 1,
   frameDataUriCacheLimit: 256,
+  frameDataUriCacheBytesLimitMb: 1500,
 
   playerReadyTimeout: 45_000,
   renderReadyTimeout: 15_000,
@@ -245,6 +260,13 @@ export function resolveConfig(overrides?: Partial<EngineConfig>): EngineConfig {
     frameDataUriCacheLimit: Math.max(
       32,
       envNum("PRODUCER_FRAME_DATA_URI_CACHE_LIMIT", DEFAULT_CONFIG.frameDataUriCacheLimit),
+    ),
+    frameDataUriCacheBytesLimitMb: Math.max(
+      64,
+      envNum(
+        "PRODUCER_FRAME_DATA_URI_CACHE_BYTES_MB",
+        DEFAULT_CONFIG.frameDataUriCacheBytesLimitMb,
+      ),
     ),
 
     playerReadyTimeout: envNum(
