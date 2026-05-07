@@ -253,4 +253,61 @@ describe("applyResolutionPreset", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("rewrites height-before-width inline CSS", () => {
+    withFixture((dir) => {
+      const file = join(dir, "index.html");
+      // Reversed property order — same as the parser's stageMatchReverse path.
+      const reversedOrderHtml = sampleHtml.replace(
+        "html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }",
+        "html, body { margin: 0; height: 1080px; width: 1920px; overflow: hidden; }",
+      );
+      writeFileSync(file, reversedOrderHtml, "utf-8");
+
+      applyResolutionPreset(dir, "landscape-4k");
+      const out = readFileSync(file, "utf-8");
+
+      expect(out).toContain("height: 2160px");
+      expect(out).toContain("width: 3840px");
+      expect(out).not.toContain("1080px");
+      expect(out).not.toContain("1920px");
+    });
+  });
+
+  it("is a no-op on a file with no dimension fingerprint (does not error)", () => {
+    withFixture((dir) => {
+      const file = join(dir, "fragment.html");
+      // No data-width/height, no html/body block, no viewport — just markup.
+      const minimal = "<!doctype html><html><head></head><body><p>hi</p></body></html>";
+      writeFileSync(file, minimal, "utf-8");
+
+      expect(() => applyResolutionPreset(dir, "landscape-4k")).not.toThrow();
+      const out = readFileSync(file, "utf-8");
+      // The htmlOpenRe path adds `data-resolution="landscape-4k"` because
+      // the <html> tag is present. That's correct: an explicit signal of
+      // intended resolution survives even when no dim fields exist.
+      expect(out).toContain('data-resolution="landscape-4k"');
+    });
+  });
+
+  it("accepts uppercase --resolution value (4K)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hf-init-test-"));
+    const target = join(dir, "proj");
+    try {
+      const res = runInit([
+        target,
+        "--example",
+        "blank",
+        "--resolution",
+        "4K",
+        "--non-interactive",
+        "--skip-skills",
+      ]);
+      expect(res.status).toBe(0);
+      const html = readFileSync(join(target, "index.html"), "utf-8");
+      expect(html).toContain('data-width="3840"');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

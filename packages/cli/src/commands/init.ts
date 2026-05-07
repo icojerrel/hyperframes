@@ -451,15 +451,16 @@ async function handleVideoFile(
 // ---------------------------------------------------------------------------
 
 /**
- * Templates ship with 1920×1080 dimensions baked into multiple places.
- * When the user picks a non-default resolution we walk every HTML file in
- * the scaffold and rewrite the dimension fingerprint:
- *   - `data-width` / `data-height` on the root composition
- *   - `data-resolution` on the <html> element (added when missing)
- *   - the `width`/`height` declared in the inline `html, body { ... }` CSS
- *   - the `<meta name="viewport">` tag's `width=`/`height=` parts
- * We rewrite by regex rather than DOM-parsing because templates have
- * decorative comments and indentation we want to preserve byte-for-byte.
+ * Rewrite the canvas dimensions in every scaffolded HTML file to match a
+ * preset. We rewrite by regex rather than DOM-parsing so template comments
+ * and indentation survive byte-for-byte — these are review-target files,
+ * not transient build artifacts.
+ *
+ * Scope: HTML files only. Templates whose `#stage` dimensions live in an
+ * external `.css` stylesheet are not patched — the bundled `blank` template
+ * inlines its CSS, and that's the convention for new templates. If you
+ * author a template with external CSS, replicate the dimension swap there
+ * by hand or move the dimensions inline.
  */
 export function applyResolutionPreset(destDir: string, resolution: CanvasResolution): void {
   const { width, height } = CANVAS_DIMENSIONS[resolution];
@@ -494,9 +495,16 @@ export function applyResolutionPreset(destDir: string, resolution: CanvasResolut
       }
     }
 
+    // Inline `html, body { ... }` CSS: handle width-before-height and
+    // height-before-width orderings. Hand-authored templates can use either.
     const bodyCssRe = /(html\s*,\s*body\s*\{[^}]*?width:\s*)\d+px([^}]*?height:\s*)\d+px/i;
     if (bodyCssRe.test(html)) {
       html = html.replace(bodyCssRe, `$1${width}px$2${height}px`);
+      changed = true;
+    }
+    const bodyCssReverseRe = /(html\s*,\s*body\s*\{[^}]*?height:\s*)\d+px([^}]*?width:\s*)\d+px/i;
+    if (bodyCssReverseRe.test(html)) {
+      html = html.replace(bodyCssReverseRe, `$1${height}px$2${width}px`);
       changed = true;
     }
 
