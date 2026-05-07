@@ -19,11 +19,13 @@ export interface Asset {
 export type TimelineElementType = "video" | "image" | "text" | "audio" | "composition";
 export type MediaElementType = "video" | "image" | "audio";
 
-export type CanvasResolution = "landscape" | "portrait";
+export type CanvasResolution = "landscape" | "portrait" | "landscape-4k" | "portrait-4k";
 
 export const CANVAS_DIMENSIONS = {
   landscape: { width: 1920, height: 1080 },
   portrait: { width: 1080, height: 1920 },
+  "landscape-4k": { width: 3840, height: 2160 },
+  "portrait-4k": { width: 2160, height: 3840 },
 } as const;
 
 export interface TimelineElementBase {

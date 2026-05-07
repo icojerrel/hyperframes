@@ -212,6 +212,51 @@ describe("parseHtml", () => {
     expect(result.resolution).toBe("portrait");
   });
 
+  it("detects landscape-4k resolution from data attribute", () => {
+    const html = `
+      <html data-resolution="landscape-4k">
+      <body>
+        <div id="stage">
+          <div id="text1" data-start="0" data-end="5"><div>Hello</div></div>
+        </div>
+      </body>
+      </html>
+    `;
+    const result = parseHtml(html);
+
+    expect(result.resolution).toBe("landscape-4k");
+  });
+
+  it("infers landscape-4k from composition dimensions", () => {
+    const html = `
+      <html data-composition-width="3840" data-composition-height="2160">
+      <body>
+        <div id="stage">
+          <div id="text1" data-start="0" data-end="5"><div>Hello</div></div>
+        </div>
+      </body>
+      </html>
+    `;
+    const result = parseHtml(html);
+
+    expect(result.resolution).toBe("landscape-4k");
+  });
+
+  it("infers portrait-4k from inline stage style", () => {
+    const html = `
+      <html>
+      <body>
+        <div id="stage" style="width: 2160px; height: 3840px;">
+          <div id="text1" data-start="0" data-end="5"><div>Hello</div></div>
+        </div>
+      </body>
+      </html>
+    `;
+    const result = parseHtml(html);
+
+    expect(result.resolution).toBe("portrait-4k");
+  });
+
   it("extracts x, y, scale, opacity from data attributes", () => {
     const html = `
       <html>

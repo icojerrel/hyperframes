@@ -90,7 +90,7 @@ function parseResolutionFromCss(doc: Document, cssText: string | null): CanvasRe
       const w = parseInt(inlineStyle.width, 10);
       const h = parseInt(inlineStyle.height, 10);
       if (w && h) {
-        return w > h ? "landscape" : "portrait";
+        return resolveResolutionFromDimensions(w, h);
       }
     }
   }
@@ -102,7 +102,7 @@ function parseResolutionFromCss(doc: Document, cssText: string | null): CanvasRe
     if (stageMatch) {
       const w = parseInt(stageMatch[1] ?? "", 10);
       const h = parseInt(stageMatch[2] ?? "", 10);
-      return w > h ? "landscape" : "portrait";
+      return resolveResolutionFromDimensions(w, h);
     }
     const stageMatchReverse = cssText.match(
       /#stage\s*\{[^}]*height:\s*(\d+)px[^}]*width:\s*(\d+)px[^}]*\}/,
@@ -110,7 +110,7 @@ function parseResolutionFromCss(doc: Document, cssText: string | null): CanvasRe
     if (stageMatchReverse) {
       const h = parseInt(stageMatchReverse[1] ?? "", 10);
       const w = parseInt(stageMatchReverse[2] ?? "", 10);
-      return w > h ? "landscape" : "portrait";
+      return resolveResolutionFromDimensions(w, h);
     }
   }
 
@@ -120,7 +120,12 @@ function parseResolutionFromCss(doc: Document, cssText: string | null): CanvasRe
 function parseResolutionFromHtml(doc: Document): CanvasResolution | null {
   const htmlEl = doc.documentElement;
   const resolutionAttr = htmlEl.getAttribute("data-resolution");
-  if (resolutionAttr === "landscape" || resolutionAttr === "portrait") {
+  if (
+    resolutionAttr === "landscape" ||
+    resolutionAttr === "portrait" ||
+    resolutionAttr === "landscape-4k" ||
+    resolutionAttr === "portrait-4k"
+  ) {
     return resolutionAttr;
   }
 
@@ -130,11 +135,19 @@ function parseResolutionFromHtml(doc: Document): CanvasResolution | null {
     const width = parseInt(widthAttr, 10);
     const height = parseInt(heightAttr, 10);
     if (width && height) {
-      return width > height ? "landscape" : "portrait";
+      return resolveResolutionFromDimensions(width, height);
     }
   }
 
   return null;
+}
+
+function resolveResolutionFromDimensions(width: number, height: number): CanvasResolution {
+  const isLandscape = width > height;
+  const longSide = Math.max(width, height);
+  const isUhd = longSide >= 2560;
+  if (isLandscape) return isUhd ? "landscape-4k" : "landscape";
+  return isUhd ? "portrait-4k" : "portrait";
 }
 
 export function parseHtml(html: string): ParsedHtml {

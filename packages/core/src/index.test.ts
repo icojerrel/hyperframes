@@ -8,6 +8,8 @@ describe("@hyperframes/core public API exports", () => {
       expect(core.CANVAS_DIMENSIONS).toBeDefined();
       expect(core.CANVAS_DIMENSIONS.landscape).toEqual({ width: 1920, height: 1080 });
       expect(core.CANVAS_DIMENSIONS.portrait).toEqual({ width: 1080, height: 1920 });
+      expect(core.CANVAS_DIMENSIONS["landscape-4k"]).toEqual({ width: 3840, height: 2160 });
+      expect(core.CANVAS_DIMENSIONS["portrait-4k"]).toEqual({ width: 2160, height: 3840 });
     });
 
     it("exports TIMELINE_COLORS", () => {
