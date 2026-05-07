@@ -257,6 +257,42 @@ describe("parseHtml", () => {
     expect(result.resolution).toBe("portrait-4k");
   });
 
+  it("classifies 1440p (QHD) as landscape, not landscape-4k", () => {
+    // Regression: an earlier `>= 2560` cutoff misclassified QHD compositions
+    // as 4K. The current rule uses the canonical 4K long-side (3840) so
+    // 2560×1440 stays in the landscape preset.
+    const html = `
+      <html data-composition-width="2560" data-composition-height="1440">
+      <body>
+        <div id="stage">
+          <div id="text1" data-start="0" data-end="5"><div>Hello</div></div>
+        </div>
+      </body>
+      </html>
+    `;
+    const result = parseHtml(html);
+
+    expect(result.resolution).toBe("landscape");
+  });
+
+  it("classifies square compositions as portrait by convention", () => {
+    // 1080×1080 has no obvious orientation. The parser collapses the tie to
+    // portrait — same bias the prior `w > h ? landscape : portrait` ternary
+    // had. Pinning so a future refactor doesn't silently flip it.
+    const html = `
+      <html data-composition-width="1080" data-composition-height="1080">
+      <body>
+        <div id="stage">
+          <div id="text1" data-start="0" data-end="5"><div>Hello</div></div>
+        </div>
+      </body>
+      </html>
+    `;
+    const result = parseHtml(html);
+
+    expect(result.resolution).toBe("portrait");
+  });
+
   it("extracts x, y, scale, opacity from data attributes", () => {
     const html = `
       <html>

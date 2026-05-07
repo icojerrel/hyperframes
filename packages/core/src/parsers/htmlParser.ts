@@ -143,9 +143,18 @@ function parseResolutionFromHtml(doc: Document): CanvasResolution | null {
 }
 
 function resolveResolutionFromDimensions(width: number, height: number): CanvasResolution {
+  // `width === height` (square) falls into the portrait branch by convention —
+  // the same bias the previous `w > h ? landscape : portrait` ternary used.
+  // Square compositions are rare; pick portrait-as-default so we don't surprise
+  // the existing call sites that depend on this behavior.
   const isLandscape = width > height;
   const longSide = Math.max(width, height);
-  const isUhd = longSide >= 2560;
+  // UHD cutoff is the long side of `landscape-4k` / `portrait-4k` (3840). A
+  // looser threshold (e.g. ≥ 2560) would silently misclassify QHD/1440p
+  // (2560×1440) as 4K, which is the wrong default for a common authoring
+  // resolution closer to 1080p than to UHD. Authors who genuinely want the
+  // 4K preset can still set `data-resolution="landscape-4k"` explicitly.
+  const isUhd = longSide >= 3840;
   if (isLandscape) return isUhd ? "landscape-4k" : "landscape";
   return isUhd ? "portrait-4k" : "portrait";
 }
