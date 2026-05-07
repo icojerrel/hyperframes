@@ -4,6 +4,8 @@ import type { Example } from "./_examples.js";
 export const examples: Example[] = [
   ["Create a project with the interactive wizard", "hyperframes init my-video"],
   ["Pick a starter example", "hyperframes init my-video --example warm-grain"],
+  ["Scaffold a 4K project", "hyperframes init my-video --resolution 4k"],
+  ["Scaffold a portrait video", "hyperframes init my-video --resolution portrait"],
   ["Start from an existing video file", "hyperframes init my-video --video clip.mp4"],
   ["Start from an audio file", "hyperframes init my-video --audio track.mp3"],
   ["Scaffold with Tailwind CSS", "hyperframes init my-video --example blank --tailwind"],
@@ -34,6 +36,34 @@ import { fetchRemoteTemplate } from "../templates/remote.js";
 import { trackInitTemplate } from "../telemetry/events.js";
 import { hasFFmpeg } from "../whisper/manager.js";
 import { VERSION } from "../version.js";
+import { CANVAS_DIMENSIONS, type CanvasResolution } from "@hyperframes/core";
+
+const VALID_RESOLUTIONS: readonly CanvasResolution[] = [
+  "landscape",
+  "portrait",
+  "landscape-4k",
+  "portrait-4k",
+] as const;
+
+const RESOLUTION_ALIASES: Record<string, CanvasResolution> = {
+  "1080p": "landscape",
+  hd: "landscape",
+  "1080p-portrait": "portrait",
+  "portrait-1080p": "portrait",
+  "4k": "landscape-4k",
+  uhd: "landscape-4k",
+  "4k-portrait": "portrait-4k",
+  "portrait-4k": "portrait-4k",
+};
+
+function normalizeResolutionFlag(input: string | undefined): CanvasResolution | undefined {
+  if (!input) return undefined;
+  const lowered = input.toLowerCase();
+  if ((VALID_RESOLUTIONS as readonly string[]).includes(lowered)) {
+    return lowered as CanvasResolution;
+  }
+  return RESOLUTION_ALIASES[lowered];
+}
 
 interface VideoMeta {
   durationSeconds: number;
@@ -417,6 +447,70 @@ async function handleVideoFile(
 }
 
 // ---------------------------------------------------------------------------
+// applyResolutionPreset — rewrite stage dimensions in scaffolded HTML
+// ---------------------------------------------------------------------------
+
+/**
+ * Templates ship with 1920×1080 dimensions baked into multiple places.
+ * When the user picks a non-default resolution we walk every HTML file in
+ * the scaffold and rewrite the dimension fingerprint:
+ *   - `data-width` / `data-height` on the root composition
+ *   - `data-resolution` on the <html> element (added when missing)
+ *   - the `width`/`height` declared in the inline `html, body { ... }` CSS
+ *   - the `<meta name="viewport">` tag's `width=`/`height=` parts
+ * We rewrite by regex rather than DOM-parsing because templates have
+ * decorative comments and indentation we want to preserve byte-for-byte.
+ */
+export function applyResolutionPreset(destDir: string, resolution: CanvasResolution): void {
+  const { width, height } = CANVAS_DIMENSIONS[resolution];
+  for (const file of listHtmlFiles(destDir)) {
+    let html = readFileSync(file, "utf-8");
+    let changed = false;
+
+    const dataWidthRe = /(data-width=)["'](\d+)["']/g;
+    if (dataWidthRe.test(html)) {
+      html = html.replace(dataWidthRe, `$1"${width}"`);
+      changed = true;
+    }
+    const dataHeightRe = /(data-height=)["'](\d+)["']/g;
+    if (dataHeightRe.test(html)) {
+      html = html.replace(dataHeightRe, `$1"${height}"`);
+      changed = true;
+    }
+
+    const htmlOpenRe = /<html\b([^>]*)>/i;
+    const htmlOpen = html.match(htmlOpenRe);
+    if (htmlOpen) {
+      const attrs = htmlOpen[1] ?? "";
+      let next: string;
+      if (/data-resolution=/.test(attrs)) {
+        next = attrs.replace(/data-resolution=["'][^"']*["']/, `data-resolution="${resolution}"`);
+      } else {
+        next = `${attrs.replace(/\s+$/, "")} data-resolution="${resolution}"`;
+      }
+      if (next !== attrs) {
+        html = html.replace(htmlOpenRe, `<html${next}>`);
+        changed = true;
+      }
+    }
+
+    const bodyCssRe = /(html\s*,\s*body\s*\{[^}]*?width:\s*)\d+px([^}]*?height:\s*)\d+px/i;
+    if (bodyCssRe.test(html)) {
+      html = html.replace(bodyCssRe, `$1${width}px$2${height}px`);
+      changed = true;
+    }
+
+    const viewportRe = /(<meta[^>]*name=["']viewport["'][^>]*content=["'])width=\d+,\s*height=\d+/i;
+    if (viewportRe.test(html)) {
+      html = html.replace(viewportRe, `$1width=${width}, height=${height}`);
+      changed = true;
+    }
+
+    if (changed) writeFileSync(file, html, "utf-8");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // scaffoldProject — copy template, patch video refs, write meta.json
 // ---------------------------------------------------------------------------
 
@@ -427,6 +521,7 @@ async function scaffoldProject(
   localVideoName: string | undefined,
   durationSeconds?: number,
   tailwind = false,
+  resolution?: CanvasResolution,
 ): Promise<void> {
   mkdirSync(destDir, { recursive: true });
 
@@ -439,6 +534,7 @@ async function scaffoldProject(
   }
   patchVideoSrc(destDir, localVideoName, durationSeconds);
   if (tailwind) writeTailwindSupport(destDir);
+  if (resolution) applyResolutionPreset(destDir, resolution);
 
   writeFileSync(
     resolve(destDir, "meta.json"),
@@ -540,6 +636,11 @@ export default defineCommand({
       type: "boolean",
       description: "Add Tailwind CSS browser-runtime support",
     },
+    resolution: {
+      type: "string",
+      description:
+        "Canvas resolution preset: landscape (1920x1080), portrait (1080x1920), landscape-4k (3840x2160), portrait-4k (2160x3840). Aliases: 1080p, 4k, uhd. Default: keep template dimensions (typically 1920x1080).",
+    },
   },
   async run({ args }) {
     if (args.template !== undefined) {
@@ -562,6 +663,20 @@ export default defineCommand({
     const modelFlag = args.model;
     const languageFlag = args.language;
     const interactive = !nonInteractive && process.stdout.isTTY === true;
+
+    let resolutionPreset: CanvasResolution | undefined;
+    if (args.resolution !== undefined) {
+      resolutionPreset = normalizeResolutionFlag(args.resolution);
+      if (!resolutionPreset) {
+        console.error(
+          c.error(
+            `Invalid --resolution: "${args.resolution}". ` +
+              `Use one of: landscape, portrait, landscape-4k, portrait-4k (or aliases 1080p, 4k, uhd).`,
+          ),
+        );
+        process.exit(1);
+      }
+    }
 
     // -----------------------------------------------------------------------
     // Non-interactive mode — all inputs from flags, defaults where missing
@@ -645,6 +760,7 @@ export default defineCommand({
           localVideoName,
           videoDuration,
           tailwind,
+          resolutionPreset,
         );
       } catch (err) {
         console.error(
@@ -840,7 +956,15 @@ export default defineCommand({
       spin.start(`Downloading example ${c.accent(templateId)}...`);
     }
     try {
-      await scaffoldProject(destDir, name, templateId, localVideoName, videoDuration, tailwind);
+      await scaffoldProject(
+        destDir,
+        name,
+        templateId,
+        localVideoName,
+        videoDuration,
+        tailwind,
+        resolutionPreset,
+      );
       if (!isBundled) {
         spin.stop(c.success(`Downloaded ${templateId}`));
       }
