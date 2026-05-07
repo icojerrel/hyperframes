@@ -281,21 +281,10 @@ export interface RenderConfig {
    */
   variables?: Record<string, unknown>;
   /**
-   * Override the output resolution. The composition's intrinsic
-   * `data-width` / `data-height` continue to drive page layout (Chrome
-   * viewport), and supersampling is achieved by setting Chrome's
-   * `deviceScaleFactor` so the captured screenshot lands at the requested
-   * dimensions. Passing a 4K preset on a 1080p composition therefore
-   * produces a 4K output without rewriting any composition HTML.
-   *
-   * Constraint: the requested dimensions must be an integer multiple of
-   * the composition's intrinsic dimensions (so DPR is a clean integer).
-   * Non-integer scales are rejected with an explanatory error before any
-   * frames are captured.
-   *
-   * Not yet supported with HDR (the layered HDR compositor processes
-   * pixel buffers at composition dimensions and would need parallel
-   * scaling); the orchestrator errors when both are set.
+   * Override the output resolution via Chrome `deviceScaleFactor` (DPR).
+   * The composition's authored dimensions are unchanged. See
+   * {@link resolveDeviceScaleFactor} for the integer-scale, aspect, and
+   * HDR constraints.
    */
   outputResolution?: CanvasResolution;
 }
@@ -594,12 +583,11 @@ export function projectBrowserEndToCompositionTimeline(
  * we can plumb a separate flag.
  *
  * Throws on:
- *   - HDR + outputResolution combination (HDR layered compositor would
- *     need parallel scaling for its raw pixel buffers).
- *   - Non-integer scale (e.g. 720p composition, 4K output → 3× height
- *     but the width ratio is also 3× ✓; 1080p portrait → 4K landscape
- *     would mismatch).
- *   - Output dimensions smaller than composition dimensions.
+ *   - HDR + outputResolution (HDR compositor processes raw pixel buffers
+ *     at composition dimensions and would need parallel scaling).
+ *   - Aspect-ratio mismatch (e.g. landscape composition → portrait-4k).
+ *   - Non-integer scale ratio.
+ *   - Downsampling (output dimensions smaller than composition).
  */
 export function resolveDeviceScaleFactor(input: {
   compositionWidth: number;
@@ -2144,13 +2132,15 @@ export async function executeRenderJob(
       outputResolution: job.config.outputResolution,
       hdrRequested: job.config.hdrMode === "force-hdr",
     });
+    const outputWidth = width * deviceScaleFactor;
+    const outputHeight = height * deviceScaleFactor;
     if (deviceScaleFactor > 1) {
       log.info("Supersampling composition via deviceScaleFactor", {
         compositionWidth: width,
         compositionHeight: height,
         outputResolution: job.config.outputResolution,
-        outputWidth: width * deviceScaleFactor,
-        outputHeight: height * deviceScaleFactor,
+        outputWidth,
+        outputHeight,
         deviceScaleFactor,
       });
     }
@@ -4018,7 +4008,7 @@ export async function executeRenderJob(
       chunkSizeFrames: enableChunkedEncode ? chunkedEncodeSize : null,
       compositionDurationSeconds: composition.duration,
       totalFrames: totalFrames,
-      resolution: { width: width * deviceScaleFactor, height: height * deviceScaleFactor },
+      resolution: { width: outputWidth, height: outputHeight },
       videoCount: composition.videos.length,
       audioCount: composition.audios.length,
       stages: perfStages,

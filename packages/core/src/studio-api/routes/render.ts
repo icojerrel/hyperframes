@@ -3,6 +3,9 @@ import { streamSSE } from "hono/streaming";
 import { existsSync, readFileSync, mkdirSync, unlinkSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { StudioApiAdapter, RenderJobState } from "../types.js";
+import { VALID_CANVAS_RESOLUTIONS, type CanvasResolution } from "../../core.types.js";
+
+const VALID_RESOLUTIONS = new Set<string>(VALID_CANVAS_RESOLUTIONS);
 
 export function registerRenderRoutes(api: Hono, adapter: StudioApiAdapter): void {
   // Scoped job store — not shared across createStudioApi() calls
@@ -59,9 +62,8 @@ export function registerRenderRoutes(api: Hono, adapter: StudioApiAdapter): void
     const quality = ["draft", "standard", "high"].includes(body.quality ?? "")
       ? (body.quality as string)
       : "standard";
-    const VALID_RESOLUTIONS = new Set(["landscape", "portrait", "landscape-4k", "portrait-4k"]);
     const outputResolution = VALID_RESOLUTIONS.has(body.resolution ?? "")
-      ? (body.resolution as "landscape" | "portrait" | "landscape-4k" | "portrait-4k")
+      ? (body.resolution as CanvasResolution)
       : undefined;
 
     const now = new Date();

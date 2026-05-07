@@ -36,34 +36,11 @@ import { fetchRemoteTemplate } from "../templates/remote.js";
 import { trackInitTemplate } from "../telemetry/events.js";
 import { hasFFmpeg } from "../whisper/manager.js";
 import { VERSION } from "../version.js";
-import { CANVAS_DIMENSIONS, type CanvasResolution } from "@hyperframes/core";
-
-const VALID_RESOLUTIONS: readonly CanvasResolution[] = [
-  "landscape",
-  "portrait",
-  "landscape-4k",
-  "portrait-4k",
-] as const;
-
-const RESOLUTION_ALIASES: Record<string, CanvasResolution> = {
-  "1080p": "landscape",
-  hd: "landscape",
-  "1080p-portrait": "portrait",
-  "portrait-1080p": "portrait",
-  "4k": "landscape-4k",
-  uhd: "landscape-4k",
-  "4k-portrait": "portrait-4k",
-  "portrait-4k": "portrait-4k",
-};
-
-function normalizeResolutionFlag(input: string | undefined): CanvasResolution | undefined {
-  if (!input) return undefined;
-  const lowered = input.toLowerCase();
-  if ((VALID_RESOLUTIONS as readonly string[]).includes(lowered)) {
-    return lowered as CanvasResolution;
-  }
-  return RESOLUTION_ALIASES[lowered];
-}
+import {
+  CANVAS_DIMENSIONS,
+  normalizeResolutionFlag,
+  type CanvasResolution,
+} from "@hyperframes/core";
 
 interface VideoMeta {
   durationSeconds: number;

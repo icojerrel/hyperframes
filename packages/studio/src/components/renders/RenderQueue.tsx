@@ -20,10 +20,10 @@ interface RenderQueueProps {
 // silently missing dropdown entry. Order is fixed by the array below.
 const RESOLUTION_LABELS: Record<ResolutionPreset | "auto", { label: string; title: string }> = {
   auto: { label: "Auto", title: "Render at the composition's authored resolution" },
-  landscape: { label: "1080p", title: "1920×1080 landscape" },
+  landscape: { label: "1080p ↔", title: "1920×1080 landscape" },
   portrait: { label: "1080p ↕", title: "1080×1920 portrait" },
   "landscape-4k": {
-    label: "4K",
+    label: "4K ↔",
     title: "3840×2160 — supersamples a 1080p composition via Chrome DPR. Slower, larger files.",
   },
   "portrait-4k": {

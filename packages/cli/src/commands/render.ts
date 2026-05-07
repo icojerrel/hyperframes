@@ -50,35 +50,10 @@ import {
   extractCompositionMetadata,
   validateVariables,
   formatVariableValidationIssue,
+  normalizeResolutionFlag,
   type VariableValidationIssue,
   type CanvasResolution,
 } from "@hyperframes/core";
-
-const VALID_RENDER_RESOLUTIONS: readonly CanvasResolution[] = [
-  "landscape",
-  "portrait",
-  "landscape-4k",
-  "portrait-4k",
-] as const;
-
-const RENDER_RESOLUTION_ALIASES: Record<string, CanvasResolution> = {
-  "1080p": "landscape",
-  hd: "landscape",
-  "1080p-portrait": "portrait",
-  "portrait-1080p": "portrait",
-  "4k": "landscape-4k",
-  uhd: "landscape-4k",
-  "4k-portrait": "portrait-4k",
-};
-
-function normalizeRenderResolutionFlag(input: string | undefined): CanvasResolution | undefined {
-  if (!input) return undefined;
-  const lowered = input.toLowerCase();
-  if ((VALID_RENDER_RESOLUTIONS as readonly string[]).includes(lowered)) {
-    return lowered as CanvasResolution;
-  }
-  return RENDER_RESOLUTION_ALIASES[lowered];
-}
 
 const VALID_FPS = new Set([24, 30, 60]);
 const VALID_QUALITY = new Set(["draft", "standard", "high"]);
@@ -245,7 +220,7 @@ export default defineCommand({
     // ── Validate resolution ────────────────────────────────────────────────
     let outputResolution: CanvasResolution | undefined;
     if (args.resolution !== undefined) {
-      outputResolution = normalizeRenderResolutionFlag(args.resolution);
+      outputResolution = normalizeResolutionFlag(args.resolution);
       if (!outputResolution) {
         errorBox(
           "Invalid resolution",
@@ -565,12 +540,7 @@ interface RenderOptions {
   variables?: Record<string, unknown>;
   entryFile?: string;
   exitAfterComplete?: boolean;
-  /**
-   * Output resolution preset. When set, the orchestrator computes a Chrome
-   * deviceScaleFactor so the screenshot lands at the requested dimensions
-   * without changing the composition. See the producer's
-   * `resolveDeviceScaleFactor` for the integer-scale + aspect constraints.
-   */
+  /** Output resolution preset; see `resolveDeviceScaleFactor` for constraints. */
   outputResolution?: CanvasResolution;
 }
 

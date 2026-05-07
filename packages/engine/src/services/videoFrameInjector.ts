@@ -48,9 +48,13 @@ interface FrameSourceCache {
  * (returning the URI directly to the caller). Without this guard, the
  * post-insert eviction loop would drop the entry we just inserted and the
  * cache would degrade into a CPU hot path — every subsequent `get()` would
- * re-read from disk and re-base64 the same frame. The lost cache hit costs
- * one re-read per access; pretending to cache and immediately evicting
- * costs one re-read per access *plus* the futile insert/evict bookkeeping.
+ * re-read from disk and re-base64 the same frame.
+ *
+ * **Invariant**: cached values MUST be strings whose `.length` equals the
+ * byte count we account for at insertion. We derive size on demand via
+ * `cache.get(key)?.length` rather than maintaining a parallel `Map<string, number>`.
+ * If you ever wrap the value (e.g. cache a Buffer or an object), the byte
+ * accounting silently breaks — switch to a parallel size map first.
  */
 function createFrameSourceCache(
   entryLimit: number,
@@ -58,7 +62,6 @@ function createFrameSourceCache(
   frameSrcResolver?: (framePath: string) => string | null,
 ): FrameSourceCache {
   const cache = new Map<string, string>();
-  const sizes = new Map<string, number>();
   const inFlight = new Map<string, Promise<string>>();
   let totalBytes = 0;
   let evictions = 0;
@@ -67,10 +70,12 @@ function createFrameSourceCache(
   function evictOldest(): void {
     const oldestKey = cache.keys().next().value;
     if (!oldestKey) return;
-    const size = sizes.get(oldestKey) ?? 0;
+    // Snapshot the value before deleting so the byte-size derivation can't
+    // accidentally read post-delete (a future reorder would silently lose
+    // accounting and surface as `totalBytes` drifting out of sync).
+    const dropped = cache.get(oldestKey);
     cache.delete(oldestKey);
-    sizes.delete(oldestKey);
-    totalBytes = Math.max(0, totalBytes - size);
+    totalBytes = Math.max(0, totalBytes - (dropped?.length ?? 0));
     evictions++;
   }
 
@@ -82,23 +87,17 @@ function createFrameSourceCache(
       oversizedRejections++;
       // Drop any stale prior version so the caller sees consistent state.
       if (cache.has(framePath)) {
-        const prev = sizes.get(framePath) ?? 0;
+        totalBytes = Math.max(0, totalBytes - (cache.get(framePath)?.length ?? 0));
         cache.delete(framePath);
-        sizes.delete(framePath);
-        totalBytes = Math.max(0, totalBytes - prev);
       }
       return dataUri;
     }
     if (cache.has(framePath)) {
-      const prev = sizes.get(framePath) ?? 0;
+      totalBytes = Math.max(0, totalBytes - (cache.get(framePath)?.length ?? 0));
       cache.delete(framePath);
-      sizes.delete(framePath);
-      totalBytes = Math.max(0, totalBytes - prev);
     }
-    const size = dataUri.length;
     cache.set(framePath, dataUri);
-    sizes.set(framePath, size);
-    totalBytes += size;
+    totalBytes += dataUri.length;
     while ((cache.size > entryLimit || totalBytes > bytesLimit) && cache.size > 0) {
       evictOldest();
     }

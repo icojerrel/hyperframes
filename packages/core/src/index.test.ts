@@ -12,6 +12,25 @@ describe("@hyperframes/core public API exports", () => {
       expect(core.CANVAS_DIMENSIONS["portrait-4k"]).toEqual({ width: 2160, height: 3840 });
     });
 
+    it("exports VALID_CANVAS_RESOLUTIONS derived from CANVAS_DIMENSIONS", () => {
+      expect(core.VALID_CANVAS_RESOLUTIONS).toEqual([
+        "landscape",
+        "portrait",
+        "landscape-4k",
+        "portrait-4k",
+      ]);
+    });
+
+    it("exports normalizeResolutionFlag with alias support", () => {
+      expect(core.normalizeResolutionFlag("4k")).toBe("landscape-4k");
+      expect(core.normalizeResolutionFlag("uhd")).toBe("landscape-4k");
+      expect(core.normalizeResolutionFlag("1080p")).toBe("landscape");
+      expect(core.normalizeResolutionFlag("landscape-4k")).toBe("landscape-4k");
+      expect(core.normalizeResolutionFlag("UHD")).toBe("landscape-4k");
+      expect(core.normalizeResolutionFlag("8k")).toBeUndefined();
+      expect(core.normalizeResolutionFlag(undefined)).toBeUndefined();
+    });
+
     it("exports TIMELINE_COLORS", () => {
       expect(core.TIMELINE_COLORS).toBeDefined();
       expect(core.TIMELINE_COLORS.video).toBeDefined();

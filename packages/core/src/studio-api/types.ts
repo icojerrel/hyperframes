@@ -1,3 +1,5 @@
+import type { CanvasResolution } from "../core.types.js";
+
 /** Resolved info about a single project. */
 export interface ResolvedProject {
   id: string;
@@ -65,12 +67,10 @@ export interface StudioApiAdapter {
     quality: string;
     jobId: string;
     /**
-     * Optional output resolution preset (e.g. "landscape-4k"). When set, the
-     * producer supersamples the composition via Chrome `deviceScaleFactor`.
-     * The composition's authored dimensions are unchanged. See the
-     * `resolveDeviceScaleFactor` constraints in the producer.
+     * Optional output resolution preset. See `resolveDeviceScaleFactor` in
+     * the producer for the integer-scale + aspect + HDR constraints.
      */
-    outputResolution?: "landscape" | "portrait" | "landscape-4k" | "portrait-4k";
+    outputResolution?: CanvasResolution;
   }): RenderJobState;
 
   /** Optional: generate a JPEG thumbnail via Puppeteer or similar. */

@@ -1685,7 +1685,7 @@ export function StudioApp() {
                   onDelete={renderQueue.deleteRender}
                   onClearCompleted={renderQueue.clearCompleted}
                   onStartRender={(format, quality, resolution) =>
-                    renderQueue.startRender(30, quality, format, resolution)
+                    renderQueue.startRender({ format, quality, resolution })
                   }
                   isRendering={renderQueue.isRendering}
                 />
