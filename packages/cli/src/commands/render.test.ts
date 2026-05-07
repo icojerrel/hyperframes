@@ -165,7 +165,7 @@ describe("renderLocal browser GPU config", () => {
       quality: "standard",
       format: "mp4",
       gpu: false,
-      browserGpu: false,
+      browserGpuMode: "software",
       hdrMode: "auto",
       quiet: true,
       entryFile: "compositions/intro.html",
@@ -181,7 +181,7 @@ describe("renderLocal browser GPU config", () => {
       quality: "standard",
       format: "mp4",
       gpu: false,
-      browserGpu: false,
+      browserGpuMode: "software",
       hdrMode: "auto",
       quiet: true,
     });
