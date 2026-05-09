@@ -1,6 +1,6 @@
 ---
 name: contribute
-description: Scaffold, build, validate, and ship new HyperFrames registry components (caption styles, VFX blocks, transitions, lower thirds). Guides the full workflow from idea to merged PR. Use when user says "contribute", "new component", "add a block", "create a caption style", "build a transition", or wants to add something to the HyperFrames registry.
+description: Author a new HyperFrames registry block (caption style, VFX block, transition, lower third) or component (text effect, overlay, snippet) and ship it as an upstream PR to the hyperframes repo. Use ONLY when the user wants to CONTRIBUTE to the public catalog — for in-project caption/transition authoring use the `hyperframes` skill, for installing existing registry items use the `hyperframes-registry` skill.
 ---
 
 # Contribute to HyperFrames Registry
@@ -65,8 +65,8 @@ Use a 2-3 letter prefix. ALL element IDs must use this prefix to avoid collision
   "type": "hyperframes:block",
   "title": "{Human Title}",
   "description": "{one sentence}",
-  "dimensions": { "width": 1920, "height": 1080 },
-  "duration": 10,
+  "dimensions": { "width": 1920, "height": 1080 }, // adjust: 1080x1920 for portrait/social
+  "duration": 10, // adjust for your composition
   "tags": ["{category}", "{subcategory}"],
   "files": [
     {
