@@ -220,6 +220,7 @@
             "group": "Contributing",
             "pages": [
               "contributing",
+              "contributing/catalog",
               "contributing/release-channels",
               "contributing/testing-local-changes"
             ]
